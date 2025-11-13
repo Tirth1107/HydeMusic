@@ -1,0 +1,118 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDE and Editor files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Operating System files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Logs and databases
+*.log
+*.sql
+*.sqlite
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# ===============================================================
+# Machine Learning / Data Science Specific
+# ===============================================================
+
+# Datasets
+# NOTE: Untrack large data folders and files.
+dataset/
+*.csv
+*.zip
+*.tar.gz
+
+# Saved Models & Checkpoints
+*.pth
+*.pt
+*.h5
+*.onnx
+best_model.pth
+pytorch_model.pth
+# Generated Output Files
+training_history.png
+confusion_matrix.png
+
+  # Jupyter Notebook checkpoints
+  .ipynb_checkpoints
+  
+  # ===============================================================
+  # Frontend / JavaScript Specific (in 'Frontend/Chatbot-Main' folder)
+  # ===============================================================
+  
+  # Dependencies
+  Frontend/Chatbot-Main/node_modules/
+  
+  # Build outputs & production artifacts
+  Frontend/Chatbot-Main/build/
+  Frontend/Chatbot-Main/dist/
+  Frontend/Chatbot-Main/.next/
+  Frontend/Chatbot-Main/out/
+  Frontend/Chatbot-Main/.vite/
+  
+  # Local environment variables
+  Frontend/Chatbot-Main/.env
+  Frontend/Chatbot-Main/.env.local
+  Frontend/Chatbot-Main/.env.*.local
+  
+  # Logs
+  Frontend/Chatbot-Main/npm-debug.log*
+  Frontend/Chatbot-Main/yarn-debug.log*
+  Frontend/Chatbot-Main/yarn-error.log*
+  # Virtual Environments
+  .venv/
+  venv/
