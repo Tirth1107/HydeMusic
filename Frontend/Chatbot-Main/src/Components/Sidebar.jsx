@@ -695,7 +695,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 type="button"
                 onClick={loadAISuggestions} 
                 className="menu-button"
-                title="Get AI suggestions"
+                title="This button is used to add 25 songs by ai suggession from the song which is currently playing"
                 disabled={isLoadingQueue}
                 style={{ opacity: isLoadingQueue ? 0.6 : 1 }}
               >
