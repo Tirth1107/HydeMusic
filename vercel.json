@@ -1,0 +1,22 @@
+{
+    "version": 2,
+    "rewrites": [
+        {
+            "source": "/api/(.*)",
+            "destination": "/api/index.py"
+        }
+    ],
+    "builds": [
+        {
+            "src": "api/index.py",
+            "use": "@vercel/python"
+        },
+        {
+            "src": "Frontend/Chatbot-Main/package.json",
+            "use": "@vercel/static-build",
+            "config": {
+                "distDir": "dist"
+            }
+        }
+    ]
+}

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, Play, Pause, SkipBack, SkipForward, Music, Shuffle, Loader, List, Plus, Volume2, VolumeX, Check, Sparkles } from "lucide-react";
+import { API_BASE_URL } from "../apiConfig";
 
 export default function Sidebar({ isOpen, onClose }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -32,7 +33,7 @@ export default function Sidebar({ isOpen, onClose }) {
     const saved = localStorage.getItem('player.isShuffled');
     return saved ? JSON.parse(saved) : false;
   });
-  const [repeatMode] = useState('off');
+  const [repeatMode, setRepeatMode] = useState('off');
   const [showQueue, setShowQueue] = useState(false);
   const [pressTimer, setPressTimer] = useState(null);
   const [isSeeking, setIsSeeking] = useState(false);
@@ -69,7 +70,7 @@ export default function Sidebar({ isOpen, onClose }) {
           const firstScriptTag = document.getElementsByTagName('script')[0];
           firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
         }
-        
+
         // Set up callback
         window.onYouTubeIframeAPIReady = () => {
           setPlayerReady(true);
@@ -113,12 +114,12 @@ export default function Sidebar({ isOpen, onClose }) {
 
   // Persist core player state
   useEffect(() => {
-    try { localStorage.setItem('player.currentTrack', JSON.stringify(currentTrack)); } catch {}
+    try { localStorage.setItem('player.currentTrack', JSON.stringify(currentTrack)); } catch { }
   }, [currentTrack]);
   useEffect(() => { localStorage.setItem('player.currentIndex', String(currentIndex)); }, [currentIndex]);
   // currentShuffleIndex no longer persisted
   useEffect(() => {
-    try { localStorage.setItem('player.playlist', JSON.stringify(playlist)); } catch {}
+    try { localStorage.setItem('player.playlist', JSON.stringify(playlist)); } catch { /* empty */ }
   }, [playlist]);
   // shuffleQueue no longer persisted
   useEffect(() => { localStorage.setItem('player.isShuffled', JSON.stringify(isShuffled)); }, [isShuffled]);
@@ -144,7 +145,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
   const searchMusic = async (query) => {
     if (!query.trim()) return;
-    
+
     setSearchLoading(true);
     try {
       const response = await fetch('http://127.0.0.1:5001/search_music', {
@@ -171,8 +172,8 @@ export default function Sidebar({ isOpen, onClose }) {
       const response = await fetch('http://127.0.0.1:5001/get_related_songs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          track_name: trackName, 
+        body: JSON.stringify({
+          track_name: trackName,
           artist_name: artistName,
           page: page,
           limit: limit
@@ -196,10 +197,10 @@ export default function Sidebar({ isOpen, onClose }) {
   const loadShuffleQueue = async (trackName, artistName) => {
     setIsLoadingQueue(true);
     try {
-      const response = await fetch('http://127.0.0.1:5001/get_ai_recommendations', {
+      const response = await fetch(`${API_BASE_URL}/get_ai_recommendations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           song_name: trackName || currentTrack?.name || '',
           artist_name: artistName || (currentTrack?.artists ? currentTrack.artists[0] : '') || ''
         }),
@@ -218,7 +219,7 @@ export default function Sidebar({ isOpen, onClose }) {
         return merged;
       });
       setHasMoreSongs(false);
-      
+
       // Show success message with AI indication
       showToast(`AI recommendations ready with ${aiRecommendations.length} songs!`, "success");
       return aiRecommendations;
@@ -234,7 +235,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const toggleShuffle = async () => {
     const newShuffleState = !isShuffled;
     setIsShuffled(newShuffleState);
-    
+
     if (!newShuffleState) {
       setShuffleQueue([]);
       setCurrentShuffleIndex(0);
@@ -296,7 +297,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
   const playTrack = (track, index = 0) => {
     console.log('Playing track:', track.name, 'YouTube ID:', track.youtube_id);
-    
+
     if (!track.youtube_id) {
       console.warn('No YouTube ID available for track:', track.name);
       showToast("This track is not available for playback", "error");
@@ -306,7 +307,7 @@ export default function Sidebar({ isOpen, onClose }) {
     setCurrentTrack(track);
     setCurrentIndex(index);
     setIsLoading(true);
-    
+
     if (!playlist.find(t => t.id === track.id)) {
       setPlaylist(prev => [...prev, track]);
     }
@@ -341,7 +342,7 @@ export default function Sidebar({ isOpen, onClose }) {
     }
 
     setIsLoading(true);
-    
+
     try {
       playerRef.current = new window.YT.Player(container, {
         height: '1',
@@ -398,7 +399,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 } else {
                   const totalTracks = playlist.length;
                   const currentIdx = currentIndex;
-                  
+
                   if (currentIdx < totalTracks - 1) {
                     handleNext();
                   } else {
@@ -417,7 +418,7 @@ export default function Sidebar({ isOpen, onClose }) {
             setIsLoading(false);
             setIsPlaying(false);
             showToast("Failed to load video. Trying next track...", "error");
-            
+
             const totalTracks = playlist.length;
             if (totalTracks > 1) {
               setTimeout(() => {
@@ -436,7 +437,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
   const togglePlayPause = () => {
     if (!playerRef.current) return;
-    
+
     try {
       if (isPlaying) {
         playerRef.current.pauseVideo();
@@ -450,11 +451,11 @@ export default function Sidebar({ isOpen, onClose }) {
 
   const handleProgressClick = (e) => {
     if (!playerRef.current || !progressRef.current) return;
-    
+
     const rect = progressRef.current.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const newTime = (clickX / rect.width) * duration;
-    
+
     playerRef.current.seekTo(newTime);
     setCurrentTime(newTime);
   };
@@ -464,7 +465,7 @@ export default function Sidebar({ isOpen, onClose }) {
     const currentModeIndex = modes.indexOf(repeatMode);
     const nextMode = modes[(currentModeIndex + 1) % modes.length];
     setRepeatMode(nextMode);
-    
+
     const modeMessages = {
       'off': 'Repeat disabled',
       'all': 'Repeat all enabled',
@@ -534,11 +535,11 @@ export default function Sidebar({ isOpen, onClose }) {
               top: '20px',
               right: '20px',
               zIndex: 1000,
-              background: toast.type === 'error' 
-                ? 'linear-gradient(135deg, #dc2626, #991b1b)' 
-                : toast.type === 'info' 
-                ? 'linear-gradient(135deg, #7c3aed, #5b21b6)' 
-                : 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+              background: toast.type === 'error'
+                ? 'linear-gradient(135deg, #dc2626, #991b1b)'
+                : toast.type === 'info'
+                  ? 'linear-gradient(135deg, #7c3aed, #5b21b6)'
+                  : 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
               color: 'white',
               padding: '12px 16px',
               borderRadius: '12px',
@@ -613,8 +614,8 @@ export default function Sidebar({ isOpen, onClose }) {
           <div className="sidebar-section">
             <h3>Now Playing</h3>
             <div className="current-track">
-              <img 
-                src={currentTrack.image || '/api/placeholder/60/60'} 
+              <img
+                src={currentTrack.image || '/api/placeholder/60/60'}
                 alt={currentTrack.name}
                 style={{ width: '60px', height: '60px', borderRadius: '8px' }}
               />
@@ -634,22 +635,22 @@ export default function Sidebar({ isOpen, onClose }) {
             </div>
 
             {/* Progress Bar */}
-            <div 
+            <div
               ref={progressRef}
               className="progress-bar"
               onClick={handleProgressClick}
-              style={{ 
-                height: '4px', 
-                backgroundColor: 'rgba(255, 255, 255, 0.2)', 
-                borderRadius: '2px', 
+              style={{
+                height: '4px',
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                borderRadius: '2px',
                 cursor: 'pointer',
                 margin: '1rem 0'
               }}
             >
-              <div 
-                style={{ 
-                  height: '100%', 
-                  backgroundColor: '#7c3aed', 
+              <div
+                style={{
+                  height: '100%',
+                  backgroundColor: '#7c3aed',
                   borderRadius: '2px',
                   width: `${duration ? (currentTime / duration) * 100 : 0}%`,
                   transition: isSeeking ? 'none' : 'width 0.1s ease'
@@ -665,9 +666,9 @@ export default function Sidebar({ isOpen, onClose }) {
 
             {/* Controls */}
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', margin: '1rem 0' }}>
-              <button 
+              <button
                 type="button"
-                onClick={toggleShuffle} 
+                onClick={toggleShuffle}
                 className={`menu-button ${isShuffled ? 'active' : ''}`}
                 disabled={isLoadingQueue}
                 style={{ opacity: isLoadingQueue ? 0.5 : 1 }}
@@ -678,10 +679,10 @@ export default function Sidebar({ isOpen, onClose }) {
               <button type="button" onClick={handlePrevious} className="menu-button" title="Previous">
                 <SkipBack size={16} />
               </button>
-              <button 
+              <button
                 type="button"
-                onClick={togglePlayPause} 
-                className="menu-button" 
+                onClick={togglePlayPause}
+                className="menu-button"
                 disabled={isLoading || !currentTrack?.youtube_id}
                 style={{ opacity: (!currentTrack?.youtube_id) ? 0.5 : 1 }}
                 title={isPlaying ? 'Pause' : 'Play'}
@@ -691,9 +692,9 @@ export default function Sidebar({ isOpen, onClose }) {
               <button type="button" onClick={handleNext} className="menu-button" title="Next">
                 <SkipForward size={16} />
               </button>
-              <button 
+              <button
                 type="button"
-                onClick={loadAISuggestions} 
+                onClick={loadAISuggestions}
                 className="menu-button"
                 title="This button is used to add 25 songs by ai suggession from the song which is currently playing"
                 disabled={isLoadingQueue}
@@ -732,8 +733,8 @@ export default function Sidebar({ isOpen, onClose }) {
             <div className="search-results">
               {searchResults.map((track, index) => (
                 <div key={track.id} className="track-item">
-                  <img 
-                    src={track.image || '/api/placeholder/40/40'} 
+                  <img
+                    src={track.image || '/api/placeholder/40/40'}
                     alt={track.name}
                     style={{ width: '40px', height: '40px', borderRadius: '4px' }}
                   />
@@ -751,10 +752,10 @@ export default function Sidebar({ isOpen, onClose }) {
                     )}
                   </div>
                   <div style={{ display: 'flex', gap: '0.25rem' }}>
-                    <button 
+                    <button
                       onClick={() => playTrack(track, index)}
                       className="menu-button"
-                      style={{ 
+                      style={{
                         padding: '0.25rem',
                         opacity: track.youtube_id ? 1 : 0.5
                       }}
@@ -762,7 +763,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     >
                       <Play size={14} />
                     </button>
-                    <button 
+                    <button
                       onClick={() => addToPlaylist(track)}
                       className="menu-button"
                       style={{ padding: '0.25rem' }}
@@ -793,16 +794,16 @@ export default function Sidebar({ isOpen, onClose }) {
                 <List size={16} />
               </button>
             </div>
-            
+
             {showQueue && (
               <div className="queue-list">
                 {playlist.map((track, index) => (
-                  <div 
-                    key={`${track.id}-${index}`} 
+                  <div
+                    key={`${track.id}-${index}`}
                     className={`track-item ${index === currentIndex ? 'active' : ''}`}
                   >
-                    <img 
-                      src={track.image || '/api/placeholder/30/30'} 
+                    <img
+                      src={track.image || '/api/placeholder/30/30'}
                       alt={track.name}
                       style={{ width: '30px', height: '30px', borderRadius: '4px' }}
                     />
@@ -814,7 +815,7 @@ export default function Sidebar({ isOpen, onClose }) {
                         {track.artists?.join(', ') || 'Unknown Artist'}
                       </div>
                     </div>
-                    <button 
+                    <button
                       onClick={() => removeFromPlaylist(track.id)}
                       className="menu-button"
                       style={{ padding: '0.25rem' }}

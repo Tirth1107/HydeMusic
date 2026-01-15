@@ -1,0 +1,992 @@
+/* ---
+  Hyde Music Premium CSS
+  --- */
+
+/* 1. FONT IMPORT (Add this to your main index.css or here) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+
+/* 2. ROOT VARIABLES (Color Palette) */
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  
+  --color-primary: #7c3aed;
+  --color-primary-light: #a78bfa;
+  
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #a0a0a0;
+  --color-text-subtle: #707070;
+  
+  --bg-base: #000000;
+  --bg-surface-1: #121212;
+  --bg-surface-2: #181818;
+  --bg-surface-hover: #282828;
+  
+  --border-color: #282828;
+}
+
+/* 3. GLOBAL RESET */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  font-family: var(--font-sans);
+  background: var(--bg-base);
+  color: var(--color-text-primary);
+  overflow: hidden; /* Critical for no page scroll */
+}
+
+/* 4. MAIN LAYOUT GRID */
+.hyde-music-container {
+  display: grid;
+  /* Define the layout areas */
+  grid-template-areas:
+    "sidebar main"
+    "player player";
+  /* Define column and row sizes */
+  grid-template-columns: 280px 1fr; /* Wider, fixed sidebar */
+  grid-template-rows: 1fr auto; /* Content fills space, player is auto-height */
+  height: 100vh;
+  width: 100vw;
+}
+
+/* 5. SIDEBAR */
+.hyde-sidebar {
+  grid-area: sidebar;
+  background: var(--bg-base);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  border-right: 1px solid var(--border-color);
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  color: var(--color-text-primary);
+}
+.brand h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+.brand p {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.search-container {
+  background: var(--bg-surface-2);
+  border-radius: 8px;
+  padding: 12px;
+  width: 1500px;
+
+}
+.search-form {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 1095px;
+  
+}
+
+.search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--color-text-secondary);
+  z-index: 1;
+  color: #FF6D00;
+
+}
+.search-input {
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 99px; /* Rounded pill shape */
+  padding: 10px 14px 10px 40px; /* Space for icon */
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  font-family: var(--font-sans);
+  width: 100%;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  color: #FF6D00;
+}
+.search-input:focus {
+  background: var(--bg-surface-hover);
+  border-color: var(--color-text-subtle);
+  outline: none;
+  color: #FF6D00;
+}
+.search-input::placeholder{
+    color: #FF6D00;
+}
+.search-loader {
+  position: absolute;
+  right: 12px;
+  color: var(--color-text-secondary);
+  animation: spin 1s linear infinite;
+}
+
+.player-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin-top: auto; /* Pushes to bottom */
+}
+
+/* 6. MAIN CONTENT */
+.hyde-main-content {
+  grid-area: main;
+  overflow-y: auto; /* Makes this part scrollable */
+  background: var(--bg-surface-1);
+  /* Gradient fade from top */
+  background: linear-gradient(to bottom, #2a2a2a 0%, var(--bg-surface-1) 300px, var(--bg-surface-1) 100%);
+  padding: 24px 32px;
+}
+
+.main-section {
+  margin-bottom: 32px;
+}
+.main-section h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+}
+.queue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.empty-state, .full-width-loader {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  padding: 32px;
+  text-align: center;
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+  margin-top: 16px;
+}
+
+/* 7. TRACK LIST (Shared) */
+.track-list {
+  display: flex;
+  flex-direction: column;
+}
+.track-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 6px;
+  transition: background 0.2s ease;
+  cursor: pointer;
+}
+.track-item:hover {
+  background: var(--bg-surface-hover);
+}
+.track-item.active {
+  background: rgba(124, 58, 237, 0.3);
+}
+.track-item.active .track-name {
+  color: var(--color-primary-light);
+}
+
+.track-image {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.track-image.small {
+  width: 30px;
+  height: 30px;
+}
+
+.track-info {
+  flex: 1;
+  min-width: 0; /* For text overflow */
+}
+.track-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.track-artist {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.track-unavailable {
+  font-size: 0.75rem;
+  color: #ff9800;
+}
+.track-controls {
+  display: flex;
+  gap: 8px;
+}
+
+/* 8. QUEUE LIST (Specifics) */
+.queue-list .track-index {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  width: 30px;
+  text-align: center;
+  position: relative;
+}
+.queue-list .active-icon {
+  color: var(--color-primary-light);
+}
+.queue-list .play-icon-button {
+  display: none; /* Hide play button by default */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 4px; /* Smaller button */
+}
+.queue-list .index-number {
+  display: block; /* Show number by default */
+}
+/* The "Premium" hover effect */
+.queue-list .track-item:hover .index-number {
+  display: none; /* Hide number on hover */
+}
+.queue-list .track-item:hover .play-icon-button {
+  display: flex; /* Show play button on hover */
+}
+/* Don't show play icon on the *active* track's number */
+.queue-list .track-item.active:hover .index-number {
+    display: block;
+}
+.queue-list .track-item.active:hover .play-icon-button {
+    display: none;
+}
+
+
+.queue-list .remove-button {
+  opacity: 0; /* Hide remove button */
+  transition: opacity 0.2s ease;
+}
+.queue-list .track-item:hover .remove-button {
+  opacity: 0.7; /* Show on hover */
+}
+.queue-list .remove-button:hover {
+  opacity: 1;
+  color: var(--color-text-primary);
+}
+
+
+/* 9. PLAYER BAR (Footer) */
+.hyde-player-bar {
+  grid-area: player;
+  background: var(--bg-surface-2);
+  border-top: 1px solid var(--border-color);
+  padding: 13px 21.5px;
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 1fr; /* 3-col layout for player */
+  align-items: center;
+  gap: 16px;
+}
+
+/* Player Left: Now Playing */
+.player-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.player-track-image {
+  width: 56px;
+  height: 56px;
+  border-radius: 4px;
+}
+.player-track-info { min-width: 0; }
+.player-track-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.player-track-artist {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Player Center: Controls & Progress */
+.player-center {
+  flex: 1.5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 500px;
+  margin: 0 auto;
+}
+.player-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.progress-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+/* Player Right: Volume */
+.player-right {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* 10. REUSABLE COMPONENTS (Buttons & Sliders) */
+
+.menu-button {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-radius: 50%;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+.menu-button:hover {
+  color: var(--color-text-primary);
+}
+.menu-button:disabled {
+  color: var(--border-color);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.menu-button.active {
+  color: var(--color-primary-light);
+}
+
+.menu-button.play-button {
+  background: var(--color-primary);
+  color: var(--color-text-primary);
+  padding: 10px;
+}
+.menu-button.play-button:hover {
+  background: #FF6D00;
+  transform: scale(1.05);
+}
+.menu-button.play-button:disabled {
+  background: var(--color-text-subtle);
+  transform: scale(1);
+}
+
+/* Premium Slider Styling */
+.progress-slider,
+.volume-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--bg-surface-hover);
+  border-radius: 99px;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+}
+.progress-slider { flex: 1;
+width: 200px; 
+transition: width 0.5s ease;}
+.volume-slider { width: 100px;
+transition: width 0.5s ease; }
+
+.progress-slider:hover { flex: 1;
+width: 500px; 
+transition: width 0.5s ease;}
+.volume-slider:hover { width: 200px;
+transition: width 0.5s ease; }
+
+/* Slider Thumb (the circle) */
+.progress-slider::-webkit-slider-thumb,
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--color-text-primary);
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0; /* Hide by default */
+  transition: opacity 0.2s ease;
+  background-color: #FF6D00;
+}
+.progress-slider::-moz-range-thumb,
+.volume-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: var(--color-text-primary);
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0;
+}
+
+/* Show thumb on hover */
+.progress-bar-container:hover .progress-slider::-webkit-slider-thumb,
+.player-right:hover .volume-slider::-webkit-slider-thumb {
+  opacity: 1;
+}
+.progress-bar-container:hover .progress-slider::-moz-range-thumb,
+.player-right:hover .volume-slider::-moz-range-thumb {
+  opacity: 1;
+}
+.progress-bar-container .progress-slider::-webkit-slider-thumb,
+.player-right .volume-slider::-webkit-slider-thumb {
+  opacity: 1;
+}
+.progress-bar-container .progress-slider::-moz-range-thumb,
+.player-right .volume-slider::-moz-range-thumb {
+  opacity: 1;
+}
+
+/* Slider Track Fill (Modern way) */
+.progress-slider,
+.volume-slider {
+  accent-color: var(--color-primary);
+}
+
+
+/* 11. TOAST NOTIFICATION */
+.toast-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(139, 92, 246, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 300px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--font-sans);
+}
+
+/* 12. ANIMATIONS */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ---
+  CSS Additions for Auth Button
+  --- */
+
+/* 1. Main Header for Auth Button */
+.main-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  /* Adjust padding as needed, 
+     this removes it from the main content padding */
+  margin: -24px -32px 24px -32px; 
+  padding: 16px 32px;
+  /* background: linear-gradient(to bottom, #2a2a2a 0%, var(--bg-surface-1) 100%); */
+  /* position: sticky; */
+  top: 0;
+  z-index: 10;
+  opacity: 0px;
+}
+
+/* 2. Auth Button Container */
+.auth-button-container {
+  
+  position: relative;
+  z-index: 11; /* Ensure it's above other content */
+}
+
+.auth-button-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-color);
+  border-radius: 99px; /* Pill shape */
+  padding: 4px 12px 4px 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.auth-button-trigger:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--color-text-subtle);
+}
+
+.auth-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border-color);
+}
+
+.auth-name {
+  max-width: 100px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 3. Profile Dropdown */
+.profile-dropdown {
+  position: absolute;
+  top: calc(100% + 8px); /* Position below the button */
+  right: 0;
+  width: 280px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+}
+
+.profile-dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 8px;
+}
+.profile-dropdown-header .auth-avatar {
+  width: 40px;
+  height: 40px;
+}
+.profile-dropdown-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.profile-dropdown-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile-dropdown-email {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+.profile-dropdown-item:hover {
+  background: var(--bg-surface-hover);
+  color: var(--color-text-primary);
+}
+/* Specific style for sign out */
+.profile-dropdown-item:last-child:hover {
+  background: rgba(239, 68, 68, 0.1); /* Red hover */
+  color: #f87171;
+}
+/* ---
+  CSS Additions for Auth Button
+  --- */
+
+
+
+/* 2. "Sign In" Button */
+.auth-button-signin {
+  background: var(--color-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 99px;
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.auth-button-signin:hover {
+  background: var(--color-primary-light);
+  transform: scale(1.05);
+}
+
+/* 3. Auth Button Container */
+.auth-button-container {
+  position: relative;
+  z-index: 11; /* Ensure it's above other content */
+}
+
+.auth-button-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-color);
+  border-radius: 99px; /* Pill shape */
+  padding: 4px 12px 4px 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.auth-button-trigger:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--color-text-subtle);
+}
+
+.auth-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border-color);
+}
+
+.auth-name {
+  max-width: 100px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 4. Profile Dropdown */
+.profile-dropdown {
+  position: absolute;
+  top: calc(100% + 8px); /* Position below the button */
+  right: 0;
+  width: 280px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+}
+
+.profile-dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 8px;
+}
+.profile-dropdown-header .auth-avatar {
+  width: 40px;
+  height: 40px;
+}
+.profile-dropdown-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.profile-dropdown-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile-dropdown-email {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+.profile-dropdown-item:hover {
+  background: var(--bg-surface-hover);
+  color: var(--color-text-primary);
+}
+/* Specific style for sign out */
+.profile-dropdown-item:last-child:hover {
+  background: rgba(239, 68, 68, 0.1); /* Red hover */
+  color: #f87171;
+}
+
+/* ---
+  CSS Additions for Auth Button
+  --- */
+
+/* 1. Main Header for Auth Button */
+.main-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  /* Adjust padding to align with sticky header */
+  margin: -24px -32px 24px -32px; 
+  padding: 16px 32px;
+  /* Sticky header effect */
+  /* background: linear-gradient(to bottom, #2a2a2a 0%, var(--bg-surface-1) 100%); */
+  /* position: sticky; */
+  top: 0;
+  z-index: 10;
+}
+
+/* 2. "Sign In" Button */
+.auth-button-signin {
+  background: var(--color-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 99px;
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.auth-button-signin:hover {
+  background: var(--color-primary-light);
+  transform: scale(1.05);
+}
+
+/* 3. Auth Button Container */
+.auth-button-container {
+  position: relative;
+  z-index: 11; /* Ensure it's above other content */
+}
+
+.auth-button-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-color);
+  border-radius: 99px; /* Pill shape */
+  padding: 4px 12px 4px 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.auth-button-trigger:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--color-text-subtle);
+}
+
+.auth-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--border-color);
+}
+
+.auth-name {
+  max-width: 100px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 4. Profile Dropdown */
+.profile-dropdown {
+  position: absolute;
+  top: calc(100% + 8px); /* Position below the button */
+  right: 0;
+  width: 280px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+}
+
+.profile-dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 8px;
+}
+.profile-dropdown-header .auth-avatar {
+  width: 40px;
+  height: 40px;
+}
+.profile-dropdown-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.profile-dropdown-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.profile-dropdown-email {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+.profile-dropdown-item:hover {
+  background: var(--bg-surface-hover);
+  color: var(--color-text-primary);
+}
+/* Specific style for sign out */
+.profile-dropdown-item:last-child:hover {
+  background: rgba(239, 68, 68, 0.1); /* Red hover */
+  color: #f87171;
+}
+
+
+.beta-popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 100vw;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(5px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 99999;
+}
+
+.beta-popup-content {
+  background: #111;
+  padding: 25px;
+  width: 90%;
+  max-width: 380px;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 0 20px rgba(255,109,0,0.4);
+  border: 1px solid #FF6D00;
+}
+
+.beta-popup-content h2 {
+  color: #FF6D00;
+  margin-bottom: 10px;
+}
+
+.beta-popup-content p {
+  color: #fff;
+  opacity: 0.9;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.close-beta-btn {
+  background: #FF6D00;
+  color: black;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 12px;
+  margin-top: 15px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.2s ease;
+}
+
+.close-beta-btn:hover {
+  background: #ffa14d;
+}

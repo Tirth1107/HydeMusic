@@ -1,1099 +1,730 @@
-// src/ChatPage.js
-
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Bot, User, AlertCircle, Copy, Check, Sparkles, MessageCircle, Square, Clock, Music, Zap, Download, Trash2, X, Menu, Plus, Search, MessageSquare, Camera, Image } from "lucide-react";
+import {
+  X, Search, Play, Pause, SkipBack, SkipForward, Music,
+  Shuffle, Loader, List, Plus, Volume2, VolumeX, Check
+} from "lucide-react"; // Removed Sparkles
+//
+// V IMPORTANT: Change this to the new CSS file name
+//
+import './HydeMusicPremium.css';
+//
+// +++ IMPORT YOUR AUTH BUTTON +++
+//
 import AuthButton from "./AuthButton";
-import Sidebar from "./Sidebar";
-import LeftSidebar from "./LeftSidebar";
-import ErrorBoundary from "./ErrorBoundary";
+import { API_BASE_URL } from "../apiConfig";
 
-export default function ChatPage() {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [copiedCode, setCopiedCode] = useState(null);
-  const [streamingMessage, setStreamingMessage] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [abortController, setAbortController] = useState(null);
-  const [uploadedImage, setUploadedImage] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
-    // Initialize from localStorage, default to false
-    const saved = localStorage.getItem('sidebarOpen');
+
+export default function HydeMusicPlayer() {
+  const [showBetaPopup, setShowBetaPopup] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [currentTrack, setCurrentTrack] = useState(() => {
+    try {
+      const saved = localStorage.getItem('player.currentTrack');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [playlist, setPlaylist] = useState(() => {
+    try {
+      const saved = localStorage.getItem('player.playlist');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [shuffleQueue, setShuffleQueue] = useState(() => []);
+  const [currentShuffleIndex, setCurrentShuffleIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    const saved = localStorage.getItem('player.currentIndex');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [isShuffled, setIsShuffled] = useState(() => {
+    const saved = localStorage.getItem('player.isShuffled');
     return saved ? JSON.parse(saved) : false;
   });
-  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(() => {
-    // Initialize from localStorage, default to false
-    const saved = localStorage.getItem('leftSidebarOpen');
-    return saved ? JSON.parse(saved) : false;
-  });
-  const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
-  const [chatHistory, setChatHistory] = useState(() => {
-    // Initialize from localStorage, default to empty array
-    const saved = localStorage.getItem('chatHistory');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [currentChatId, setCurrentChatId] = useState(() => {
-    // Initialize from localStorage, default to null
-    const saved = localStorage.getItem('currentChatId');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
-  const quickActionsRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const [repeatMode] = useState('off');
+  const [showQueue, setShowQueue] = useState(true);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [volume, setVolume] = useState(0.7);
+  const [isMuted, setIsMuted] = useState(false);
+  const [previousVolume, setPreviousVolume] = useState(0.7);
+  const [playerReady, setPlayerReady] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  // const [isLoadingQueue, setIsLoadingQueue] = useState(false); // Removed AI state
 
-  // Save sidebar state to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('sidebarOpen', JSON.stringify(isSidebarOpen));
-  }, [isSidebarOpen]);
+  const playerRef = useRef(null);
+  const progressRef = useRef(null);
+  const volumeRef = useRef(null);
 
-  useEffect(() => {
-    localStorage.setItem('leftSidebarOpen', JSON.stringify(isLeftSidebarOpen));
-  }, [isLeftSidebarOpen]);
+  // Toast notification function
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast({ show: false, message: "", type: "success" });
+    }, 3000);
+  };
 
+  // Initialize YouTube API when component mounts
   useEffect(() => {
-    localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
-  }, [chatHistory]);
-
-  useEffect(() => {
-    localStorage.setItem('currentChatId', JSON.stringify(currentChatId));
-  }, [currentChatId]);
-
-  // Ensure there is always an active chat and load its messages on first mount
-  useEffect(() => {
-    if (!currentChatId) {
-      const existingHistory = Array.isArray(chatHistory) ? chatHistory : [];
-      if (existingHistory.length > 0) {
-        setCurrentChatId(existingHistory[0].id);
-        setMessages(existingHistory[0].messages || []);
+    const initYouTubeAPI = () => {
+      if (window.YT && window.YT.Player) {
+        setPlayerReady(true);
       } else {
-        const newChatId = Date.now().toString();
-        const newChat = {
-          id: newChatId,
-          title: "New Chat",
-          messages: [],
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          created: new Date().toISOString(),
-          lastUpdated: new Date().toISOString()
+        if (!window.YT && !document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+          const tag = document.createElement('script');
+          tag.src = 'https://www.youtube.com/iframe_api';
+          const firstScriptTag = document.getElementsByTagName('script')[0];
+          firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        }
+
+        window.onYouTubeIframeAPIReady = () => {
+          setPlayerReady(true);
         };
-        setChatHistory([newChat]);
-        setCurrentChatId(newChatId);
       }
-    } else {
-      // Load messages for the active chat from history (in case of reload)
-      const active = chatHistory.find(c => c.id === currentChatId);
-      if (active) {
-        setMessages(active.messages || []);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    };
+    const timer = setTimeout(initYouTubeAPI, 100);
+    return () => clearTimeout(timer);
   }, []);
 
-  // Persist the current chat's messages into chatHistory whenever messages change
+  // Initialize player when track changes
   useEffect(() => {
-    if (!currentChatId) return;
-    setChatHistory(prev => {
-      const history = Array.isArray(prev) ? prev : [];
-      const idx = history.findIndex(c => c.id === currentChatId);
-      const updatedChat = {
-        id: currentChatId,
-        title: history[idx]?.title || (messages[0]?.text ? messages[0].text.slice(0, 40) : "New Chat"),
-        messages: messages,
-        timestamp: history[idx]?.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        created: history[idx]?.created || new Date().toISOString(),
-        lastUpdated: new Date().toISOString()
-      };
-      if (idx === -1) return [updatedChat, ...history];
-      const copy = [...history];
-      copy[idx] = updatedChat;
-      return copy;
-    });
-  }, [messages, currentChatId]);
-
-  // Close quick actions when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (quickActionsRef.current && !quickActionsRef.current.contains(event.target)) {
-        setIsQuickActionsOpen(false);
-      }
-    };
-
-    if (isQuickActionsOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+    if (currentTrack && playerReady && currentTrack.youtube_id) {
+      const timer = setTimeout(() => {
+        initializePlayer();
+      }, 200);
+      return () => clearTimeout(timer);
     }
+  }, [currentTrack, playerReady]);
 
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      try {
+        if (playerRef.current && typeof playerRef.current.destroy === 'function') {
+          playerRef.current.destroy();
+          playerRef.current = null;
+        }
+        const container = document.getElementById('youtube-player');
+        if (container && container.parentNode) {
+          container.parentNode.removeChild(container);
+        }
+      } catch (e) {
+        console.warn('Player cleanup failed during unmount:', e);
+      }
     };
-  }, [isQuickActionsOpen]);
+  }, []);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
+  // Persist core player state
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, streamingMessage]);
+    try { localStorage.setItem('player.currentTrack', JSON.stringify(currentTrack)); } catch { }
+  }, [currentTrack]);
+  useEffect(() => { localStorage.setItem('player.currentIndex', String(currentIndex)); }, [currentIndex]);
+  useEffect(() => {
+    try { localStorage.setItem('player.playlist', JSON.stringify(playlist)); } catch { }
+  }, [playlist]);
+  useEffect(() => { localStorage.setItem('player.isShuffled', JSON.stringify(isShuffled)); }, [isShuffled]);
 
-  const copyToClipboard = async (text, index) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedCode(index);
-      setTimeout(() => setCopiedCode(null), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
-  };
-
-  const stopGeneration = () => {
-    if (abortController) {
-      abortController.abort();
-      setAbortController(null);
-    }
-    
-    // Save the current streaming message as a complete message
-    if (streamingMessage.trim()) {
-      const botMessage = { 
-        sender: "bot", 
-        text: streamingMessage,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages((prev) => [...prev, botMessage]);
-    }
-    
-    setStreamingMessage("");
-    setIsStreaming(false);
-    setLoading(false);
-  };
-
-  const handleNewChat = () => {
-    // Save current chat if it has messages
-    if (messages.length > 0 && currentChatId) {
-      const updatedHistory = chatHistory.map(chat => 
-        chat.id === currentChatId 
-          ? { ...chat, messages: messages, lastUpdated: new Date().toISOString() }
-          : chat
-      );
-      setChatHistory(updatedHistory);
-    }
-
-    // Create new chat
-    const newChatId = Date.now().toString();
-    const newChat = {
-      id: newChatId,
-      title: "New Chat",
-      messages: [],
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      created: new Date().toISOString(),
-      lastUpdated: new Date().toISOString()
-    };
-
-    setChatHistory(prev => [newChat, ...prev]);
-    setCurrentChatId(newChatId);
-    setMessages([]);
-    setStreamingMessage("");
-    setIsStreaming(false);
-    setError("");
-    setIsLeftSidebarOpen(false);
-  };
-
-  const handleSelectChat = (chatId) => {
-    // Save current chat if it has messages
-    if (messages.length > 0 && currentChatId) {
-      const updatedHistory = chatHistory.map(chat => 
-        chat.id === currentChatId 
-          ? { ...chat, messages: messages, lastUpdated: new Date().toISOString() }
-          : chat
-      );
-      setChatHistory(updatedHistory);
-    }
-
-    // Load selected chat
-    const selectedChat = chatHistory.find(chat => chat.id === chatId);
-    if (selectedChat) {
-      setCurrentChatId(chatId);
-      setMessages(selectedChat.messages || []);
-      setStreamingMessage("");
-      setIsStreaming(false);
-      setError("");
-      setIsLeftSidebarOpen(false);
-    }
-  };
-
-  const clearChat = () => {
-    setMessages([]);
-    setError("");
-    setStreamingMessage("");
-    setIsStreaming(false);
-    if (abortController) {
-      abortController.abort();
-      setAbortController(null);
-    }
-  };
-
-  const renderMarkdownInline = (str, keyPrefix = "") => {
-    const chunks = String(str).split(/(\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_)/);
-    return chunks.map((chunk, idx) => {
-      if (/^\*\*[^*]+\*\*$/.test(chunk) || /^__[^_]+__$/.test(chunk)) {
-        const text = chunk.slice(2, -2);
-        return <strong key={`${keyPrefix}b${idx}`}>{text}</strong>;
-      }
-      if (/^\*[^*]+\*$/.test(chunk) || /^_[^_]+_$/.test(chunk)) {
-        const text = chunk.slice(1, -1);
-        return <em key={`${keyPrefix}i${idx}`}>{text}</em>;
-      }
-      return <React.Fragment key={`${keyPrefix}t${idx}`}>{chunk}</React.Fragment>;
-    });
-  };
-
-  const renderWithLineBreaks = (str) => {
-    const lines = String(str).split("\n");
-    return lines.map((line, i) => {
-      // Check if line is a markdown header
-      const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
-      if (headerMatch) {
-        const level = headerMatch[1].length;
-        const text = headerMatch[2];
-        
-        // Get appropriate emoji based on header level and content
-        const getHeaderEmoji = (level, text) => {
-          const lowerText = text.toLowerCase();
-          
-          // Content-based emojis
-          if (lowerText.includes('feature') || lowerText.includes('benefit')) return '✨';
-          if (lowerText.includes('step') || lowerText.includes('install') || lowerText.includes('setup')) return '🔧';
-          if (lowerText.includes('example') || lowerText.includes('demo')) return '💡';
-          if (lowerText.includes('tip') || lowerText.includes('note') || lowerText.includes('important')) return '💡';
-          if (lowerText.includes('error') || lowerText.includes('issue') || lowerText.includes('problem')) return '⚠️';
-          if (lowerText.includes('solution') || lowerText.includes('fix')) return '✅';
-          if (lowerText.includes('code') || lowerText.includes('implementation')) return '💻';
-          if (lowerText.includes('summary') || lowerText.includes('conclusion')) return '📋';
-          if (lowerText.includes('change') || lowerText.includes('update')) return '🔄';
-          if (lowerText.includes('key') || lowerText.includes('main') || lowerText.includes('primary')) return '🔑';
-          
-          // Level-based fallback emojis
-          switch (level) {
-            case 1: return '🎯';
-            case 2: return '📌';
-            case 3: return '▶️';
-            default: return '•';
+  // Update progress
+  useEffect(() => {
+    let interval;
+    if (isPlaying && !isSeeking) {
+      interval = setInterval(() => {
+        try {
+          const time = playerRef.current.getCurrentTime();
+          if (time !== undefined) {
+            setCurrentTime(time);
           }
-        };
-        
-        const emoji = getHeaderEmoji(level, text);
-        const HeadingTag = `h${Math.min(level, 6)}`;
-        
-        return (
-          <React.Fragment key={i}>
-            <HeadingTag 
-              style={{
-                fontSize: level === 1 ? '1.4em' : level === 2 ? '1.2em' : '1.05em',
-                fontWeight: level === 1 ? '700' : level === 2 ? '600' : '500',
-                color: level === 1 ? '#7c3aed' : level === 2 ? '#8b5cf6' : '#a78bfa',
-                margin: level === 1 ? '20px 0 12px 0' : level === 2 ? '16px 0 10px 0' : '12px 0 8px 0',
-                lineHeight: '1.4',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                borderLeft: level === 1 ? '4px solid #7c3aed' : level === 2 ? '3px solid #8b5cf6' : 'none',
-                paddingLeft: level <= 2 ? '12px' : '0',
-                background: level === 1 ? 'linear-gradient(90deg, rgba(124, 58, 237, 0.05), transparent)' : 'transparent',
-                borderRadius: level === 1 ? '4px' : '0'
-              }}
-            >
-              <span style={{ fontSize: '1.1em', minWidth: '20px' }}>{emoji}</span>
-              <span>{renderMarkdownInline(text, `h${i}-`)}</span>
-            </HeadingTag>
-            {i < lines.length - 1 ? <br /> : null}
-          </React.Fragment>
-        );
-      }
-      
-      return (
-        <React.Fragment key={i}>
-          {renderMarkdownInline(line, `l${i}-`)}
-          {i < lines.length - 1 ? <br /> : null}
-        </React.Fragment>
-      );
-    });
-  };
-
-  const formatMessage = (text) => {
-    const parts = String(text).split(/(```[\s\S]*?```|`[^`]*`)/);
-
-    return parts.map((part, index) => {
-      if (part.startsWith("```") && part.endsWith("```")) {
-        const code = part.slice(3, -3);
-        const lines = code.split("\n");
-        const firstLine = lines[0].trim();
-        const language = firstLine.match(/^[A-Za-z0-9#.+-]+$/) ? firstLine : "code";
-        const codeContent = firstLine === language ? lines.slice(1).join("\n") : code;
-
-        return (
-          <motion.div 
-            key={index} 
-            className="code-block"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
-          >
-            <div className="code-block__header">
-              <div className="code-block__dots">
-                <span className="dot dot--red"></span>
-                <span className="dot dot--yellow"></span>
-                <span className="dot dot--green"></span>
-              </div>
-              <span className="code-block__lang">{language || "code"}</span>
-              <button
-                onClick={() => copyToClipboard(codeContent.trim(), `block-${index}`)}
-                className="code-block__copy"
-                title="Copy code"
-              >
-                {copiedCode === `block-${index}` ? (
-                  <>
-                    <Check className="icon" /> Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="icon" /> Copy
-                  </>
-                )}
-              </button>
-            </div>
-            <pre className="code-block__content">
-              <code>{codeContent.trim()}</code>
-            </pre>
-          </motion.div>
-        );
-      } else if (part.startsWith("`") && part.endsWith("`")) {
-        const code = part.slice(1, -1);
-        return (
-          <span key={index} className="code-inline">
-            {code}
-            <button
-              onClick={() => copyToClipboard(code, `inline-${index}`)}
-              className="code-inline__btn"
-              aria-label="Copy"
-              title="Copy"
-            >
-              {copiedCode === `inline-${index}` ? <Check className="icon" /> : <Copy className="icon" />}
-            </button>
-          </span>
-        );
-      }
-      return (
-        <span key={index}>
-          {renderWithLineBreaks(part)}
-        </span>
-      );
-    });
-  };
-
-  const sendMessage = async () => {
-    if (!input.trim() && !uploadedImage) return;
-
-    // Ensure an active chat exists
-    if (!currentChatId) {
-      const newChatId = Date.now().toString();
-      const newChat = {
-        id: newChatId,
-        title: "New Chat",
-        messages: [],
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        created: new Date().toISOString(),
-        lastUpdated: new Date().toISOString()
-      };
-      setChatHistory(prev => [newChat, ...(Array.isArray(prev) ? prev : [])]);
-      setCurrentChatId(newChatId);
+        } catch (error) {
+          console.error('Error getting current time:', error);
+        }
+      }, 1000);
     }
+    return () => clearInterval(interval);
+  }, [isPlaying, isSeeking]);
 
-    const userMessage = { 
-      sender: "user", 
-      text: input || "What do you see in this image?",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      image: imagePreview // Include image preview for display
-    };
-    setMessages((prev) => [...prev, userMessage]);
-    
-    const currentInput = input;
-    const currentImage = uploadedImage;
-    
-    setInput("");
-    setUploadedImage(null);
-    setImagePreview(null);
-    setLoading(true);
-    setIsStreaming(true);
-    setStreamingMessage("");
-    setError("");
+  const searchMusic = async (query) => {
+    if (!query.trim()) return;
 
-    // Create AbortController for this request
-    const controller = new AbortController();
-    setAbortController(controller);
+    setSearchLoading(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/search_music`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query }),
+      });
+      if (!response.ok) throw new Error('Search failed');
+      const data = await response.json();
+      setSearchResults(data.tracks || []);
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchResults([]);
+      showToast("Search failed. Please try again.", "error");
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  // Removed loadShuffleQueue and loadAISuggestions
+
+  const toggleShuffle = async () => {
+    const newShuffleState = !isShuffled;
+    setIsShuffled(newShuffleState);
+
+    if (!newShuffleState) {
+      setShuffleQueue([]);
+      setCurrentShuffleIndex(0);
+      showToast("Shuffle disabled", "info");
+    } else {
+      showToast("Shuffle enabled", "info");
+    }
+  };
+
+  const handleNext = () => {
+    const totalTracks = playlist.length;
+    if (totalTracks === 0) return;
+    if (isShuffled) {
+      let nextIndex = currentIndex;
+      if (totalTracks > 1) {
+        while (nextIndex === currentIndex) {
+          nextIndex = Math.floor(Math.random() * totalTracks);
+        }
+      }
+      setCurrentIndex(nextIndex);
+      setCurrentTrack(playlist[nextIndex]);
+      return;
+    }
+    const nextIndex = (currentIndex + 1) % totalTracks;
+    setCurrentIndex(nextIndex);
+    setCurrentTrack(playlist[nextIndex]);
+  };
+
+  const handlePrevious = () => {
+    const totalTracks = playlist.length;
+    if (totalTracks === 0) return;
+    if (isShuffled) {
+      let prevIndex = currentIndex;
+      if (totalTracks > 1) {
+        while (prevIndex === currentIndex) {
+          prevIndex = Math.floor(Math.random() * totalTracks);
+        }
+      }
+      setCurrentIndex(prevIndex);
+      setCurrentTrack(playlist[prevIndex]);
+      return;
+    }
+    const prevIndex = currentIndex === 0 ? totalTracks - 1 : currentIndex - 1;
+    setCurrentIndex(prevIndex);
+    setCurrentTrack(playlist[prevIndex]);
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    searchMusic(searchQuery);
+  };
+
+  const playTrack = (track, index = 0) => {
+    if (!track.youtube_id) {
+      showToast("This track is not available for playback", "error");
+      return;
+    }
+    setCurrentTrack(track);
+    let trackIndex = playlist.findIndex(t => t.id === track.id);
+    if (trackIndex === -1) {
+      const newPlaylist = [track, ...playlist];
+      setPlaylist(newPlaylist);
+      trackIndex = 0;
+    }
+    setCurrentIndex(trackIndex);
+    setIsLoading(true);
+  };
+
+  const playTrackFromSearch = (track) => {
+    if (!track.youtube_id) {
+      showToast("This track is not available for playback", "error");
+      return;
+    }
+    let trackIndex = playlist.findIndex(t => t.id === track.id);
+    if (trackIndex !== -1) {
+      setCurrentTrack(track);
+      setCurrentIndex(trackIndex);
+    } else {
+      const newPlaylist = [track, ...playlist];
+      setPlaylist(newPlaylist);
+      setCurrentTrack(track);
+      setCurrentIndex(0);
+    }
+    setIsLoading(true);
+  };
+
+  const initializePlayer = () => {
+    let container = document.getElementById('youtube-player');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'youtube-player';
+      container.style.cssText = 'position: fixed; top: -9999px; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; z-index: -9999;';
+      document.body.appendChild(container);
+    }
+    try {
+      if (playerRef.current && typeof playerRef.current.destroy === 'function') {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+    } catch (e) { console.warn('Player destroy failed:', e); }
+    if (!currentTrack?.youtube_id) {
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
 
     try {
-      // Prepare the request body
-      const requestBody = { 
-        session_id: "user123", 
-        question: currentInput || "What do you see in this image?"
-      };
-
-      // If there's an image, add it to the request
-      if (currentImage) {
-        requestBody.image = currentImage;
-        requestBody.has_image = true;
-      }
-
-      const response = await fetch("http://127.0.0.1:5001/chat/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
+      playerRef.current = new window.YT.Player(container, {
+        height: '1', width: '1', videoId: currentTrack.youtube_id,
+        playerVars: {
+          autoplay: 1, controls: 0, disablekb: 1, fs: 0,
+          modestbranding: 1, rel: 0, showinfo: 0, start: 0,
+          origin: window.location.origin, enablejsapi: 1
+        },
+        events: {
+          onReady: (event) => {
             try {
-              const data = JSON.parse(line.slice(6));
-              
-              if (data.error) {
-                throw new Error(data.error);
+              const duration = event.target.getDuration();
+              setDuration(duration > 0 ? duration : 180);
+              event.target.setVolume(Math.round(volume * 100));
+              setIsLoading(false);
+              event.target.playVideo();
+            } catch (e) { setIsLoading(false); }
+          },
+          onStateChange: (event) => {
+            try {
+              if (event.data === window.YT.PlayerState.PLAYING) {
+                setIsPlaying(true); setIsLoading(false);
+              } else if (event.data === window.YT.PlayerState.PAUSED) {
+                setIsPlaying(false);
+              } else if (event.data === window.YT.PlayerState.ENDED) {
+                if (repeatMode === 'one') {
+                  setTimeout(() => {
+                    if (playerRef.current) {
+                      try {
+                        playerRef.current.seekTo(0);
+                        playerRef.current.playVideo();
+                        setCurrentTime(0);
+                      } catch (e) { console.error('Repeat error:', e); }
+                    }
+                  }, 100);
+                } else {
+                  handleNext();
+                }
+              } else if (event.data === window.YT.PlayerState.BUFFERING) {
+                setIsLoading(true);
               }
-              
-              if (data.chunk && !data.done) {
-                setStreamingMessage(prev => prev + data.chunk);
-              }
-              
-              if (data.done) {
-                const finalResponse = data.full_response || streamingMessage;
-                const botMessage = { 
-                  sender: "bot", 
-                  text: finalResponse,
-                  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                };
-                setMessages((prev) => [...prev, botMessage]);
-                setStreamingMessage("");
-                setIsStreaming(false);
-                setLoading(false);
-                setAbortController(null);
-                return;
-              }
-            } catch (parseError) {
-              console.error("Error parsing SSE data:", parseError);
+            } catch (e) { console.error('State change error:', e); }
+          },
+          onError: (event) => {
+            console.error('YouTube player error:', event.data);
+            setIsLoading(false); setIsPlaying(false);
+            showToast("Failed to load video. Trying next track...", "error");
+            if (playlist.length > 1) {
+              setTimeout(() => { handleNext(); }, 1000);
             }
           }
         }
+      });
+    } catch (error) {
+      console.error('Failed to initialize YouTube player:', error);
+      setIsLoading(false);
+      showToast("YouTube player initialization failed", "error");
+    }
+  };
+
+  const togglePlayPause = () => {
+    if (!playerRef.current) return;
+    try {
+      if (isPlaying) {
+        playerRef.current.pauseVideo();
+      } else {
+        playerRef.current.playVideo();
       }
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        // Request was aborted by user
-        return;
-      }
-      
-      const errorMessage = {
-        sender: "bot",
-        text: err.message || "Sorry, I'm having trouble connecting to the server.",
-        isError: true,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-      setError(err.message || "Request failed");
-      setStreamingMessage("");
-      setIsStreaming(false);
-      setAbortController(null);
-    } finally {
-      setLoading(false);
+    } catch (error) { console.error('Error toggling play/pause:', error); }
+  };
+
+  const handleProgressClick = (e) => {
+    if (!playerRef.current || !progressRef.current) return;
+    const rect = progressRef.current.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const newTime = (clickX / rect.width) * duration;
+    playerRef.current.seekTo(newTime);
+    setCurrentTime(newTime);
+  };
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const addToPlaylist = (track) => {
+    if (!playlist.find(t => t.id === track.id)) {
+      setPlaylist(prev => [...prev, track]);
+      showToast(`"${track.name}" added to queue!`, "success");
+    } else {
+      showToast(`"${track.name}" is already in queue`, "info");
     }
   };
 
-  const handleImageUpload = (event) => {
-    const file = event.target.files[0];
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64String = e.target.result;
-        setImagePreview(base64String);
-        // Convert to base64 without data URL prefix for backend
-        const base64Data = base64String.split(',')[1];
-        setUploadedImage(base64Data);
-      };
-      reader.readAsDataURL(file);
+  const removeFromPlaylist = (trackId) => {
+    setPlaylist(prev => prev.filter(t => t.id !== trackId));
+    showToast("Track removed from queue", "info");
+  };
+
+  const toggleMute = () => {
+    if (isMuted) {
+      setVolume(previousVolume);
+      setIsMuted(false);
+      if (playerRef.current) playerRef.current.setVolume(previousVolume * 100);
+    } else {
+      setPreviousVolume(volume);
+      setVolume(0);
+      setIsMuted(true);
+      if (playerRef.current) playerRef.current.setVolume(0);
     }
   };
 
-  const removeImage = () => {
-    setUploadedImage(null);
-    setImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const handleVolumeChange = (e) => {
+    const newVolume = parseFloat(e.target.value);
+    setVolume(newVolume);
+    setIsMuted(newVolume === 0);
+    if (playerRef.current) {
+      playerRef.current.setVolume(newVolume * 100);
     }
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
-
-  const exportChat = () => {
-    const chatData = {
-      timestamp: new Date().toISOString(),
-      messages: messages.map((msg) => ({
-        sender: msg.sender,
-        text: msg.text,
-        timestamp: msg.timestamp,
-        isError: msg.isError || false
-      }))
-    };
-    const jsonString = JSON.stringify(chatData, null, 2);
-    const blob = new Blob([jsonString], { type: "application/json" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `chat_history_${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
   };
 
   return (
-    <div className="chat-root theme--dark">
-      {/* Animated background */}
-      <div className="bg-anim bg-anim--dark" aria-hidden="true" />
-
-      <header className="chat-header">
-        <div className="chat-header__left">
-          <button 
-            className="btn btn--ghost" 
-            onClick={() => setIsLeftSidebarOpen(true)}
-            title="Chat History"
-            style={{ marginRight: '12px' }}
-          >
-            <Menu className="icon" />
-          </button>
-          <div className="chat-logo">
-            <Sparkles className="icon" />
-          </div>
-          <div>
-            <h1 className="chat-title">VibeEra</h1>
-            <p className="chat-subtitle">Powered by Qwen2.5-Coder</p>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button 
-            className="btn btn--ghost" 
-            onClick={() => setIsSidebarOpen(true)}
-            title="Open Music Player"
-          >
-            <Music className="icon" />
-            Music
-          </button>
-          <AuthButton />
-          <button 
-            className="btn btn--ghost" 
-            onClick={() => setIsQuickActionsOpen(true)}
-            title="Quick Actions"
-          >
-            <Zap className="icon" />
-            Quick Actions
-          </button>
-        </div>
-      </header>
-
+    <>
       <AnimatePresence>
-        {error && (
+        {toast.show && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="error-banner"
+            initial={{ opacity: 0, y: -50, x: 50 }}
+            animate={{ opacity: 1, y: 0, x: 0 }}
+            exit={{ opacity: 0, y: -50, x: 50 }}
+            className="toast-notification"
           >
-            <AlertCircle className="icon" />
-            <span className="error-text">{error}</span>
+            <Check size={16} />
+            {toast.message}
           </motion.div>
         )}
       </AnimatePresence>
 
+      {/* --- BETA VERSION POPUP --- */}
       <AnimatePresence>
-        {isQuickActionsOpen && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="quick-actions-backdrop"
-              onClick={() => setIsQuickActionsOpen(false)}
-              style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.3)',
-                zIndex: 999,
-              }}
-            />
-            
-            {/* Popup */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: -10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: -10 }}
-              className="quick-actions-popup"
-              ref={quickActionsRef}
-              style={{
-                position: 'fixed',
-                top: '70px',
-                right: '20px',
-                backgroundColor: 'rgba(20, 20, 30, 0.98)',
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '16px',
-                padding: '12px',
-                minWidth: '180px',
-                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-                zIndex: 1000,
-              }}
-            >
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '2px',
-                fontSize: '14px'
-              }}>
-                <div style={{
-                  padding: '8px 12px',
-                  color: 'rgba(255, 255, 255, 0.6)',
-                  fontSize: '12px',
-                  fontWeight: '500',
-                  borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                  marginBottom: '4px'
-                }}>
-                  Quick Actions
-                </div>
-                
-                <button 
-                  className="btn btn--ghost" 
-                  onClick={() => {
-                    clearChat();
-                    setIsQuickActionsOpen(false);
-                  }}
-                  title="Clear Chat"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    justifyContent: 'flex-start',
-                    padding: '10px 12px',
-                    borderRadius: '10px',
-                    width: '100%',
-                    color: '#ff6b6b',
-                    fontSize: '14px',
-                    fontWeight: '400',
-                    border: 'none',
-                    backgroundColor: 'transparent',
-                    transition: 'all 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = 'rgba(255, 107, 107, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <Trash2 size={16} />
-                  Clear Chat
-                </button>
-                
-                <button 
-                  className="btn btn--ghost" 
-                  onClick={() => {
-                    exportChat();
-                    setIsQuickActionsOpen(false);
-                  }}
-                  title="Export Chat"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    justifyContent: 'flex-start',
-                    padding: '10px 12px',
-                    borderRadius: '10px',
-                    width: '100%',
-                    color: 'rgba(255, 255, 255, 0.8)',
-                    fontSize: '14px',
-                    fontWeight: '400',
-                    border: 'none',
-                    backgroundColor: 'transparent',
-                    transition: 'all 0.2s ease',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <Download size={16} />
-                  Export Chat
-                </button>
-              </div>
-            </motion.div>
-          </>
+        {showBetaPopup && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="beta-popup"
+          >
+            <div className="beta-popup-content">
+              <h2>Hyde Music (Beta)</h2>
+              <p>
+                Hyde Music is currently in <strong>beta</strong>.
+                You may experience bugs or missing features —
+                we’re improving things every day.
+                Thanks for supporting the project!
+              </p>
+              <button onClick={() => setShowBetaPopup(false)} className="close-beta-btn">
+                Continue
+              </button>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
-      <main className="chat-main">
-        <div className="chat-content">
-          {messages.length === 0 && !isStreaming && (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              className="welcome"
-            >
-              <div className="welcome__logo">
-                <motion.div
-                  animate={{ 
-                    rotate: [0, 360],
-                    scale: [1, 1.1, 1]
-                  }}
-                  transition={{ 
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: "easeInOut"
-                  }}
+
+      <div className="hyde-music-container">
+
+        <nav className="hyde-sidebar">
+          <div className="brand">
+            {/* <Music size={32} /> */}
+            <h1 style={{ color: 'green' }}>Hyde Music</h1>
+            <p style={{ color: '#FF6D00' }}>By Tirth</p><span style={{ color: '#FF6D00' }}>(Beta V-1.0)</span>
+            <span><warn>Please Check For Any Update On <a href="https://hyde-music.vercel.app/" target="_blank" style={{ color: '#FF6D00', textDecoration: 'none' }} onMouseOver={(e) => e.target.style.textDecoration = 'underline'} onMouseOut={(e) => e.target.style.textDecoration = 'none'}>Hyde Music</a></warn> Official Site.</span>
+
+          </div>
+          <div className="queue-header">
+            <h2 style={{ color: '#FF6D00' }}>Queue ({playlist.length} tracks)</h2>
+            <button style={{ color: '#FF6D00' }} onClick={() => setShowQueue(!showQueue)} className="menu-button" title={showQueue ? "Hide Queue" : "Show Queue"}>
+              <List size={16} />
+            </button>
+          </div>
+
+          {playlist.length === 0 && (
+            <p className="empty-state" style={{ color: '#FF6D00' }}>Your queue is empty.</p>
+          )}
+
+          {showQueue && (
+            <div className="track-list queue-list">
+              {playlist.map((track, index) => (
+                <div
+                  key={`${track.id}-${index}`}
+                  className={`track-item ${index === currentIndex ? 'active' : ''}`}
+                  onDoubleClick={() => playTrack(track, index)}
                 >
-                  <MessageCircle className="welcome__icon" />
-                </motion.div>
-              </div>
-              <h1 className="welcome__title">Welcome to VibeEra</h1>
-              <p className="welcome__desc">I'm your AI assistant. Ask me anything and I'll help you!</p>
-              <div className="welcome__suggestions">
-                <button className="suggestion-chip" onClick={() => setInput("What can you help me with?")}>
-                  What can you help me with?
-                </button>
-                <button className="suggestion-chip" onClick={() => setInput("Write a Python function")}>
-                  Write a Python function
-                </button>
-                <button className="suggestion-chip" onClick={() => setInput("Explain a concept")}>
-                  Explain a concept
-                </button>
-              </div>
-            </motion.div>
+                  <div className="track-index">
+                    <span className="index-number" style={{ color: '#FF6D00' }}>{index === currentIndex ? <Volume2 size={16} className="active-icon" /> : index + 1}</span>
+                    <button className="play-icon-button menu-button" onClick={() => playTrack(track, index)} style={{ color: '#FF6D00' }} >
+                      <Play size={16} />
+                    </button>
+                  </div>
+                  <img
+                    src={track.image || '/api/placeholder/30/30'}
+                    alt={track.name}
+                    className="track-image small"
+                  />
+                  <div className="track-info">
+                    <div className="track-name">{track.name}</div>
+                    <div className="track-artist">{track.artists?.join(', ') || 'Unknown Artist'}</div>
+                  </div>
+                  <button
+                    style={{ color: '#FF6D00' }}
+                    onClick={() => removeFromPlaylist(track.id)}
+                    className="menu-button remove-button"
+                    title="Remove from Queue"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
 
-          <AnimatePresence>
-            {messages.map((msg, idx) => (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -20, scale: 0.95 }}
-                transition={{ 
-                  duration: 0.4,
-                  type: "spring",
-                  stiffness: 100,
-                  damping: 15
-                }}
-                className={`msg-row ${msg.sender === "user" ? "msg-row--end" : "msg-row--start"}`}
-              >
-                {msg.sender === "bot" && (
-                  <motion.div 
-                    className="avatar avatar--bot"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <Bot className="icon" />
-                  </motion.div>
-                )}
+          {/* <div className="search-container">
+            <form onSubmit={handleSearch} className="search-form">
+                <Search size={18} className="search-icon" />
+                <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search for music..."
+                className="search-input"
+                />
+                {searchLoading && <Loader size={16} className="search-loader" />}
+            </form>
+          </div> */}
 
-                <div className="message-container">
-                  {msg.image && (
-                    <div className="message-image">
-                      <img 
-                        src={msg.image} 
-                        alt="Uploaded" 
-                        style={{
-                          maxWidth: '300px',
-                          maxHeight: '200px',
-                          borderRadius: '8px',
-                          marginBottom: '8px',
-                          objectFit: 'cover'
-                        }}
-                      />
-                    </div>
-                  )}
-                  <div
-                    className={`bubble ${
-                      msg.sender === "user"
-                        ? "bubble--user"
-                        : msg.isError
-                        ? "bubble--error"
-                        : "bubble--bot"
-                    }`}
-                  >
-                    <div className="bubble__content">{formatMessage(msg.text)}</div>
+          {!playerReady && (
+            <div className="player-loading">
+              <Loader size={16} className="animate-spin" />
+              <span style={{ color: '#FF6D00' }}>Loading Player...</span>
+            </div>
+          )}
+        </nav>
+
+        <main className="hyde-main-content">
+
+          {/* +++ AUTH BUTTON INSERTED HERE +++ */}
+          <header className="main-header">
+            <div className="search-container">
+              <form onSubmit={handleSearch} className="search-form">
+                <Search size={18} className="search-icon" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search for music..."
+                  className="search-input"
+                />
+                {searchLoading && <Loader size={16} className="search-loader" />}
+              </form>
+            </div>
+            <AuthButton />
+
+          </header>
+
+          <section className="main-section">
+            <h2 style={{ color: '#FF6D00' }}>Search Results</h2>
+            {searchLoading && <div className="full-width-loader"><Loader size={24} className="animate-spin" /></div>}
+
+            {!searchLoading && searchResults.length === 0 && (
+              <p className="empty-state" style={{ color: '#FF6D00' }}>Search for songs to get started.</p>
+            )}
+
+            <div className="track-list">
+              {searchResults.map((track) => (
+                <div key={track.id} className="track-item" onDoubleClick={() => playTrackFromSearch(track)}>
+                  <img
+                    src={track.image || '/api/placeholder/40/40'}
+                    alt={track.name}
+                    className="track-image"
+                  />
+                  <div className="track-info">
+                    <div className="track-name">{track.name}</div>
+                    <div className="track-artist">{track.artists?.join(', ') || 'Unknown Artist'}</div>
+                    {!track.youtube_id && (
+                      <div className="track-unavailable" style={{ color: '#FF6D00' }}>No playable version</div>
+                    )}
                   </div>
-                  <div className="message-meta">
-                    <span className="message-time">
-                      <Clock className="time-icon" />
-                      {msg.timestamp}
-                    </span>
-                  </div>
-                </div>
-
-                {msg.sender === "user" && (
-                  <motion.div 
-                    className="avatar avatar--user"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <User className="icon" />
-                  </motion.div>
-                )}
-              </motion.div>
-            ))}
-          </AnimatePresence>
-
-          {/* Streaming message */}
-          {isStreaming && streamingMessage && (
-            <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              className="msg-row msg-row--start"
-            >
-              <motion.div 
-                className="avatar avatar--bot avatar--streaming"
-                animate={{ 
-                  boxShadow: [
-                    "0 0 0 0 rgba(124, 58, 237, 0.4)",
-                    "0 0 0 8px rgba(124, 58, 237, 0)",
-                  ]
-                }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-              >
-                <Bot className="icon" />
-              </motion.div>
-              <div className="message-container">
-                <div className="bubble bubble--bot bubble--streaming">
-                  <div className="bubble__content">{formatMessage(streamingMessage)}</div>
-                  <div className="streaming-indicator">
-                    <motion.div
-                      className="cursor-blink"
-                      animate={{ opacity: [1, 0] }}
-                      transition={{ duration: 0.8, repeat: Infinity }}
+                  <div className="track-controls">
+                    <button
+                      style={{ color: '#FF6D00' }}
+                      onClick={() => playTrackFromSearch(track)}
+                      className="menu-button"
+                      title="Play"
+                      disabled={!track.youtube_id}
                     >
-                      |
-                    </motion.div>
+                      <Play size={16} />
+                    </button>
+                    <button
+                      style={{ color: '#FF6D00' }}
+                      onClick={() => addToPlaylist(track)}
+                      className="menu-button"
+                      title="Add to Queue"
+                    >
+                      <Plus size={16} />
+                    </button>
                   </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
+              ))}
+            </div>
+          </section>
 
-          {loading && !streamingMessage && (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              className="typing"
-            >
-              <motion.div 
-                className="avatar avatar--bot avatar--thinking"
-                animate={{ 
-                  boxShadow: [
-                    "0 0 0 0 rgba(124, 58, 237, 0.4)",
-                    "0 0 0 8px rgba(124, 58, 237, 0)",
-                  ]
-                }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-              >
-                <Bot className="icon" />
-              </motion.div>
-              <div className="typing__bubble">
-                <div className="dots">
-                  <motion.span 
-                    className="dot"
-                    animate={{ y: [0, -8, 0] }}
-                    transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
-                  />
-                  <motion.span 
-                    className="dot"
-                    animate={{ y: [0, -8, 0] }}
-                    transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
-                  />
-                  <motion.span 
-                    className="dot"
-                    animate={{ y: [8, 0] }}
-                    transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
-                  />
+          {/* <section className="main-section">
+             <div className="queue-header">
+                <h2 style={{ color: '#FF6D00' }}>Queue ({playlist.length} tracks)</h2>
+                <button style={{ color: '#FF6D00' }} onClick={() => setShowQueue(!showQueue)} className="menu-button" title={showQueue ? "Hide Queue" : "Show Queue"}>
+                  <List size={16} />
+                </button>
+             </div>
+
+            {playlist.length === 0 && (
+                <p className="empty-state" style={{ color: '#FF6D00' }}>Your queue is empty.</p>
+            )}
+
+            {showQueue && (
+                <div className="track-list queue-list">
+                {playlist.map((track, index) => (
+                  <div 
+                    key={`${track.id}-${index}`} 
+                    className={`track-item ${index === currentIndex ? 'active' : ''}`}
+                    onDoubleClick={() => playTrack(track, index)}
+                  >
+                    <div className="track-index">
+                        <span className="index-number" style={{ color: '#FF6D00' }}>{index === currentIndex ? <Volume2 size={16} className="active-icon" /> : index + 1}</span>
+                        <button className="play-icon-button menu-button" onClick={() => playTrack(track, index)} style={{ color: '#FF6D00' }} >
+                            <Play size={16} />
+                        </button>
+                    </div>
+                    <img 
+                      src={track.image || '/api/placeholder/30/30'} 
+                      alt={track.name}
+                      className="track-image small"
+                    />
+                    <div className="track-info">
+                      <div className="track-name">{track.name}</div>
+                      <div className="track-artist">{track.artists?.join(', ') || 'Unknown Artist'}</div>
+                    </div>
+                    <button 
+                      style={{ color: '#FF6D00' }}
+                      onClick={() => removeFromPlaylist(track.id)}
+                      className="menu-button remove-button"
+                      title="Remove from Queue"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section> */}
+
+        </main>
+
+        <footer className="hyde-player-bar">
+
+          <div className="player-left">
+            {currentTrack && (
+              <>
+                <img
+                  src={currentTrack.image || '/api/placeholder/60/60'}
+                  alt={currentTrack.name}
+                  className="player-track-image"
+                />
+                <div className="player-track-info">
+                  <div className="player-track-name">{currentTrack.name}</div>
+                  <div className="player-track-artist">{currentTrack.artists?.join(', ') || 'Unknown Artist'}</div>
                 </div>
-                <span className="typing__text">AI is thinking...</span>
-              </div>
-            </motion.div>
-          )}
+              </>
+            )}
+          </div>
 
-          <div ref={messagesEndRef} />
-        </div>
-      </main>
-
-      <footer className="chat-input">
-        <div className="chat-input__inner">
-          {imagePreview && (
-            <div className="image-preview">
-              <img 
-                src={imagePreview} 
-                alt="Preview" 
-                style={{
-                  maxWidth: '100px',
-                  maxHeight: '100px',
-                  borderRadius: '8px',
-                  objectFit: 'cover',
-                  border: '2px solid rgba(124, 58, 237, 0.3)'
-                }}
-              />
+          <div className="player-center">
+            <div className="player-controls">
               <button
-                onClick={removeImage}
-                className="remove-image-btn"
-                style={{
-                  position: 'absolute',
-                  top: '-8px',
-                  right: '-8px',
-                  background: 'rgba(220, 38, 38, 0.9)',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '24px',
-                  height: '24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: 'white'
-                }}
+                type="button"
+                onClick={toggleShuffle}
+                className={`menu-button ${isShuffled ? 'active' : ''}`}
+                title="Shuffle queue"
               >
-                <X size={14} />
+                <Shuffle size={16} />
+              </button>
+              <button type="button" onClick={handlePrevious} className="menu-button" title="Previous">
+                <SkipBack size={18} />
+              </button>
+
+              <button
+                type="button"
+                onClick={togglePlayPause}
+                className="menu-button play-button"
+                disabled={isLoading || !currentTrack?.youtube_id}
+                title={isPlaying ? 'Pause' : 'Play'}
+              >
+                {isLoading ? <Loader size={24} className="animate-spin" /> : isPlaying ? <Pause size={24} /> : <Play size={24} />}
+              </button>
+
+              <button type="button" onClick={handleNext} className="menu-button" title="Next">
+                <SkipForward size={18} />
               </button>
             </div>
-          )}
-          <div className="chat-input__row">
-            <motion.textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={uploadedImage ? "Ask a question about your image..." : "Ask me anything... (Shift+Enter for new line)"}
-              className="chat-textarea"
-              rows={1}
-              disabled={loading}
-              onInput={(e) => {
-                e.target.style.height = "auto";
-                e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px";
-              }}
-              whileFocus={{ scale: 1.02 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            />
-            <div className="chat-input__buttons">
+
+            <div className="progress-bar-container">
+              <span>{formatTime(currentTime)}</span>
               <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleImageUpload}
-                accept="image/*"
-                style={{ display: 'none' }}
+                type="range"
+                min="0"
+                max={duration || 1}
+                value={currentTime}
+                step="1"
+                ref={progressRef}
+                className="progress-slider"
+                onChange={(e) => setCurrentTime(e.target.value)}
+                onMouseUp={handleProgressClick}
+                onTouchEnd={handleProgressClick}
               />
-              <motion.button
-                onClick={() => fileInputRef.current?.click()}
-                className="btn btn--ghost btn--icon"
-                title="Upload Image"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                style={{
-                  padding: '8px',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(124, 58, 237, 0.3)',
-                  background: uploadedImage ? 'rgba(124, 58, 237, 0.1)' : 'transparent',
-                  color: uploadedImage ? '#7c3aed' : 'rgba(255, 255, 255, 0.7)',
-                  minWidth: '40px',
-                  height: '40px'
-                }}
-              >
-                <Image className="icon" size={18} />
-              </motion.button>
-              {isStreaming ? (
-                <motion.button
-                  onClick={stopGeneration}
-                  className="btn btn--danger chat-send"
-                  title="Stop generation"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Square className="icon" />
-                </motion.button>
-              ) : (
-                <motion.button
-                  onClick={sendMessage}
-                  disabled={loading || (!input.trim() && !uploadedImage)}
-                  className="btn btn--primary chat-send"
-                  title="Send"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Send className="icon" />
-                </motion.button>
-              )}
+              <span>{formatTime(duration)}</span>
             </div>
           </div>
-        </div>
-        <p className="hint">Press Enter to send, Shift+Enter for new line • Click image icon to upload photos</p>
-      </footer>
 
-      {/* Sidebar */}
-      <ErrorBoundary>
-        <Sidebar 
-          isOpen={isSidebarOpen} 
-          onClose={() => setIsSidebarOpen(false)} 
-        />
-      </ErrorBoundary>
-      {/* Left Sidebar */}
-      <LeftSidebar 
-        isOpen={isLeftSidebarOpen} 
-        onClose={() => setIsLeftSidebarOpen(false)} 
-        onNewChat={handleNewChat} 
-        onSelectChat={handleSelectChat} 
-        onRenameChat={(chatId, newTitle) => {
-          setChatHistory(prev => prev.map(c => c.id === chatId ? { ...c, title: newTitle, lastUpdated: new Date().toISOString() } : c));
-        }}
-        onDeleteChat={(chatId) => {
-          setChatHistory(prev => prev.filter(c => c.id !== chatId));
-          if (currentChatId === chatId) {
-            const remaining = chatHistory.filter(c => c.id !== chatId);
-            if (remaining.length > 0) {
-              setCurrentChatId(remaining[0].id);
-              setMessages(remaining[0].messages || []);
-            } else {
-              setCurrentChatId(null);
-              setMessages([]);
-            }
-          }
-        }}
-        chatHistory={chatHistory} 
-        currentChatId={currentChatId} 
-      />
-    </div>
+          <div className="player-right">
+            <button type="button" onClick={toggleMute} className="menu-button">
+              {isMuted || volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
+            </button>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={volume}
+              onChange={handleVolumeChange}
+              className="volume-slider"
+              ref={volumeRef}
+            />
+          </div>
+
+        </footer>
+      </div>
+    </>
   );
 }
