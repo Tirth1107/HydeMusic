@@ -361,4 +361,5 @@ python3 test_integration.py
 ollama serve                    # Terminal 1
 source venv/bin/activate && python3 main_api.py  # Terminal 2
 cd Frontend/Chatbot-Main && npm run dev          # Terminal 3
-``` 
+``` #   H y d e M u s i c  
+ 
