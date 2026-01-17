@@ -12,8 +12,14 @@ import './HydeMusicPremium.css';
 // +++ IMPORT YOUR AUTH BUTTON +++
 //
 import AuthButton from "./AuthButton";
-import { API_BASE_URL } from "../apiConfig";
+import { apiFetch, transformTrack } from "../api/client";
 
+
+const PremiumLoader = () => (
+  <div className="premium-loader">
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+);
 
 export default function HydeMusicPlayer() {
   const [showBetaPopup, setShowBetaPopup] = useState(true)
@@ -151,14 +157,20 @@ export default function HydeMusicPlayer() {
 
     setSearchLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/search_music`, {
+      let response = await apiFetch(`/search_music`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query }),
       });
+
+      if (!response.ok || response.status === 404) {
+        response = await apiFetch(`/search?q=${encodeURIComponent(query)}`);
+      }
+
       if (!response.ok) throw new Error('Search failed');
+
       const data = await response.json();
-      setSearchResults(data.tracks || []);
+      const rawTracks = Array.isArray(data) ? data : (data.tracks || []);
+      setSearchResults(rawTracks.map(transformTrack).filter(t => t));
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
@@ -546,7 +558,7 @@ export default function HydeMusicPlayer() {
 
           <section className="main-section">
             <h2 style={{ color: '#FF6D00' }}>Search Results</h2>
-            {searchLoading && <div className="full-width-loader"><Loader size={24} className="animate-spin" /></div>}
+            {searchLoading && <PremiumLoader />}
 
             {!searchLoading && searchResults.length === 0 && (
               <p className="empty-state" style={{ color: '#FF6D00' }}>Search for songs to get started.</p>

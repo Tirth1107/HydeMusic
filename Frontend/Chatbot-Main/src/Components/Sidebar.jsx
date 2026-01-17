@@ -1,7 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, Play, Pause, SkipBack, SkipForward, Music, Shuffle, Loader, List, Plus, Volume2, VolumeX, Check, Sparkles } from "lucide-react";
-import { API_BASE_URL } from "../apiConfig";
+import { apiFetch, transformTrack } from "../api/client";
+
+const PremiumLoader = () => (
+  <div className="premium-loader">
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+);
 
 export default function Sidebar({ isOpen, onClose }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -148,16 +154,20 @@ export default function Sidebar({ isOpen, onClose }) {
 
     setSearchLoading(true);
     try {
-      const response = await fetch('http://127.0.0.1:5001/search_music', {
+      let response = await apiFetch('/search_music', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query }),
       });
+
+      if (!response.ok || response.status === 404) {
+        response = await apiFetch(`/search?q=${encodeURIComponent(query)}`);
+      }
 
       if (!response.ok) throw new Error('Search failed');
 
       const data = await response.json();
-      setSearchResults(data.tracks || []);
+      const rawTracks = Array.isArray(data) ? data : (data.tracks || []);
+      setSearchResults(rawTracks.map(transformTrack).filter(t => t));
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
@@ -169,9 +179,8 @@ export default function Sidebar({ isOpen, onClose }) {
 
   const fetchRelatedSongs = async (trackName, artistName, page = 0, limit = 5) => {
     try {
-      const response = await fetch('http://127.0.0.1:5001/get_related_songs', {
+      const response = await apiFetch('/get_related_songs', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           track_name: trackName,
           artist_name: artistName,
@@ -197,9 +206,8 @@ export default function Sidebar({ isOpen, onClose }) {
   const loadShuffleQueue = async (trackName, artistName) => {
     setIsLoadingQueue(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/get_ai_recommendations`, {
+      const response = await apiFetch('/get_ai_recommendations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           song_name: trackName || currentTrack?.name || '',
           artist_name: artistName || (currentTrack?.artists ? currentTrack.artists[0] : '') || ''
@@ -730,6 +738,7 @@ export default function Sidebar({ isOpen, onClose }) {
         {searchResults.length > 0 && (
           <div className="sidebar-section">
             <h3>Search Results</h3>
+            {searchLoading && <PremiumLoader />}
             <div className="search-results">
               {searchResults.map((track, index) => (
                 <div key={track.id} className="track-item">

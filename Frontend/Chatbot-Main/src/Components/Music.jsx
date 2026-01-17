@@ -6,7 +6,7 @@ import {
   Home, Library, Trash2, Heart, Repeat
 } from "lucide-react";
 import AuthButton from "./AuthButton";
-import { API_BASE_URL } from "../apiConfig";
+import { apiFetch, transformTrack } from "../api/client";
 
 const CURATED_PLAYLISTS = [
   { id: 'c1', name: 'Hindi Party Hits', color: '#ff4b2b', description: 'Non-stop Bollywood party anthems.', search: 'hindi party songs' },
@@ -25,6 +25,13 @@ const CURATED_PLAYLISTS = [
   { id: 'c14', name: 'Acoustic Soul', color: '#f6d365', description: 'Raw emotions through strings.', search: 'acoustic pop' },
   { id: 'c15', name: 'Trending India', color: '#ff0844', description: 'What India is listening to right now.', search: 'top hindu songs india' },
 ];
+
+
+const PremiumLoader = () => (
+  <div className="premium-loader">
+    <span></span><span></span><span></span><span></span><span></span>
+  </div>
+);
 
 export default function MusicPage() {
   const [activeView, setActiveView] = useState("home");
@@ -118,9 +125,8 @@ export default function MusicPage() {
   const fetchAutoplayTracks = useCallback(async (track) => {
     if (!track) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/get_related_songs`, {
+      const response = await apiFetch(`/get_related_songs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           track_name: track.name,
           artist_name: track.artists?.[0] || "",
@@ -252,10 +258,14 @@ export default function MusicPage() {
         return;
       }
       try {
-        const response = await fetch(`${API_BASE_URL}/suggestions?q=${encodeURIComponent(searchQuery)}`);
+        const response = await apiFetch(`/suggestions?q=${encodeURIComponent(searchQuery)}`);
+        if (!response.ok) throw new Error();
         const data = await response.json();
-        setSuggestions(data);
-      } catch { /* ignore */ }
+        setSuggestions(Array.isArray(data) ? data : []);
+      } catch {
+        // Fallback mock suggestions for better UX if backend is missing them
+        setSuggestions([`${searchQuery} music`, `${searchQuery} hits`, `${searchQuery} mix`]);
+      }
     };
     const timer = setTimeout(fetchSuggestions, 300);
     return () => clearTimeout(timer);
@@ -273,15 +283,23 @@ export default function MusicPage() {
     setShowSuggestions(false);
     setActiveView("search");
     try {
-      const response = await fetch(`${API_BASE_URL}/search_music`, {
+      let response = await apiFetch(`/search_music`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query }),
       });
+
+      if (!response.ok || response.status === 404) {
+        response = await apiFetch(`/search?q=${encodeURIComponent(query)}`);
+      }
+
+      if (!response.ok) throw new Error('Search failed');
+
       const data = await response.json();
-      setSearchResults(data.tracks || []);
-    } catch {
-      showToast("Search failed", "error");
+      const rawTracks = Array.isArray(data) ? data : (data.tracks || []);
+      setSearchResults(rawTracks.map(transformTrack).filter(t => t));
+    } catch (err) {
+      console.error("Search error:", err);
+      showToast("Search failed. Please try again.", "error");
     } finally {
       setSearchLoading(false);
     }
@@ -290,13 +308,18 @@ export default function MusicPage() {
   const loadPlaylistTracks = useCallback(async (query) => {
     setSearchLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/search_music`, {
+      let response = await apiFetch(`/search_music`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query }),
       });
+
+      if (!response.ok || response.status === 404) {
+        response = await apiFetch(`/search?q=${encodeURIComponent(query)}`);
+      }
+
       const data = await response.json();
-      return data.tracks || [];
+      const rawTracks = Array.isArray(data) ? data : (data.tracks || []);
+      return rawTracks.map(transformTrack).filter(t => t);
     } catch {
       return [];
     } finally {
@@ -632,7 +655,7 @@ export default function MusicPage() {
                 )}
                 <div className="track-list">
                   {searchResults.map((track, i) => renderTrackItem(track, i, searchResults))}
-                  {searchLoading && <div style={{ textAlign: 'center', padding: '20px' }}><Sparkles className="animate-spin" /></div>}
+                  {searchLoading && <PremiumLoader />}
                 </div>
               </motion.div>
             )}

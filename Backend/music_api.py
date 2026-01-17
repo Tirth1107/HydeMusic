@@ -1,15 +1,18 @@
 import os
 import requests
+import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import yt_dlp
 import logging
+from urllib.parse import quote_plus
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
 # Enable CORS for all routes with specific production-ready settings
 CORS(app, resources={
     r"/*": {
@@ -39,26 +42,45 @@ def require_api_key(f):
     decorated.__name__ = f.__name__
     return decorated
 
-def format_track(entry):
+def format_track_ytdlp(entry):
+    """Formats raw yt-dlp entry into the standardized track object."""
     video_id = entry.get('id')
     if not video_id:
         return None
     return {
-        "id": f"yt_{video_id}",
-        "name": entry.get("title"),
-        "title": entry.get("title"),
-        "artists": [entry.get("uploader", "Unknown Artist")],
+        "id": f"youtube_{video_id}",
+        "name": entry.get("title", "Unknown Title"),
+        "artists": ["YouTube"],
+        "album": "YouTube Music",
         "image": f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
-        "thumbnail": f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
         "youtube_id": video_id,
-        "url": f"https://www.youtube.com/watch?v={video_id}",
-        "duration": entry.get("duration", 0) * 1000,
+        "duration": int(entry.get("duration", 0)) * 1000,
         "source": "youtube"
     }
 
+def ytdlp_search(query, limit=10):
+    """Reliable YouTube search using yt-dlp's built-in search service."""
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'noplaylist': True,
+        'quiet': True,
+        'no_warnings': True,
+        'extract_flat': True,
+        'skip_download': True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            data = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
+            entries = data.get('entries', [])
+            tracks = [format_track_ytdlp(entry) for entry in entries if entry]
+            return [t for t in tracks if t]
+    except Exception as e:
+        logger.error(f"yt-dlp search error for query '{query}': {str(e)}")
+        raise e
+
 @app.route("/", methods=["GET"])
 def home():
-    return jsonify({"status": "Hyde Music API running"})
+    return jsonify({"status": "Hyde Music API running", "engine": "yt-dlp native search"})
 
 @app.route("/search", methods=["GET", "OPTIONS"])
 @require_api_key
@@ -67,54 +89,26 @@ def search():
     if not query:
         return jsonify({"error": "Query parameter 'q' is required"}), 400
 
-    logger.info(f"Searching for: {query}")
-    
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'noplaylist': True,
-        'quiet': True,
-        'no_warnings': True,
-        'extract_flat': True,
-    }
-
+    logger.info(f"YTDLP GET Search: {query}")
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            search_results = ydl.extract_info(f"ytsearch10:{query}", download=False)
-            entries = search_results.get('entries', [])
-            songs = [format_track(entry) for entry in entries if entry]
-            songs = [s for s in songs if s]
-            return jsonify(songs)
-    except Exception as e:
-        logger.error(f"Search error: {str(e)}")
+        tracks = ytdlp_search(query)
+        return jsonify(tracks)
+    except Exception:
         return jsonify({"error": "Failed to search music"}), 500
 
 @app.route("/search_music", methods=["POST", "OPTIONS"])
 @require_api_key
 def search_music():
     data = request.json
-    query = data.get("query")
-    if not query:
-        return jsonify({"error": "Query is required"}), 400
-
-    logger.info(f"Searching music for: {query}")
+    if not data or "query" not in data:
+        return jsonify({"error": "JSON body with 'query' is required"}), 400
     
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'noplaylist': True,
-        'quiet': True,
-        'no_warnings': True,
-        'extract_flat': True,
-    }
-
+    query = data.get("query")
+    logger.info(f"YTDLP POST Search: {query}")
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            search_results = ydl.extract_info(f"ytsearch10:{query}", download=False)
-            entries = search_results.get('entries', [])
-            tracks = [format_track(entry) for entry in entries if entry]
-            tracks = [t for t in tracks if t]
-            return jsonify({"tracks": tracks})
-    except Exception as e:
-        logger.error(f"Search music error: {str(e)}")
+        tracks = ytdlp_search(query)
+        return jsonify({"tracks": tracks})
+    except Exception:
         return jsonify({"error": "Failed to search music"}), 500
 
 @app.route("/suggestions", methods=["GET", "OPTIONS"])
@@ -125,10 +119,7 @@ def get_suggestions():
         return jsonify([])
     
     logger.info(f"Fetching suggestions for: {query}")
-    import json
-    from urllib.parse import quote_plus
     try:
-        # YouTube Google Suggest API
         url = f"https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&client=firefox&q={quote_plus(query)}"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -151,13 +142,11 @@ def stream():
         return jsonify({"error": "URL parameter 'url' is required"}), 400
 
     logger.info(f"Extracting stream for: {url}")
-    
     ydl_opts = {
         'format': 'bestaudio/best',
         'quiet': True,
         'no_warnings': True,
     }
-
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -172,14 +161,11 @@ def stream():
 @app.route("/trending_music", methods=["GET", "OPTIONS"])
 @require_api_key
 def trending_music():
-    logger.info("Fetching trending music")
+    logger.info("Fetching trending music via YTDLP")
     try:
-        with yt_dlp.YoutubeDL({'quiet': True, 'extract_flat': True, 'no_warnings': True}) as ydl:
-            search_results = ydl.extract_info("ytsearch10:top trending music 2026", download=False)
-            tracks = [format_track(entry) for entry in search_results.get('entries', []) if entry]
-            tracks = [t for t in tracks if t]
-            return jsonify({"tracks": tracks})
-    except Exception as e:
+        tracks = ytdlp_search("top trending music 2026", limit=10)
+        return jsonify({"tracks": tracks})
+    except Exception:
         return jsonify({"tracks": []})
 
 @app.route("/get_related_songs", methods=["POST", "OPTIONS"])
@@ -189,14 +175,10 @@ def get_related_songs():
     track_name = data.get("track_name", "")
     artist_name = data.get("artist_name", "")
     query = f"{track_name} {artist_name} mix"
-    
     try:
-        with yt_dlp.YoutubeDL({'quiet': True, 'extract_flat': True, 'no_warnings': True}) as ydl:
-            search_results = ydl.extract_info(f"ytsearch8:{query}", download=False)
-            tracks = [format_track(entry) for entry in search_results.get('entries', []) if entry]
-            tracks = [t for t in tracks if t]
-            return jsonify({"tracks": tracks, "has_more": False})
-    except Exception as e:
+        tracks = ytdlp_search(query, limit=8)
+        return jsonify({"tracks": tracks, "has_more": False})
+    except Exception:
         return jsonify({"tracks": [], "has_more": False})
 
 @app.route("/get_ai_recommendations", methods=["POST", "OPTIONS"])
