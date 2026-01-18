@@ -56,6 +56,18 @@ body {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
+  transition: grid-template-columns 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.hyde-music-container.sidebar-collapsed {
+  grid-template-columns: 0px 1fr;
+}
+
+.hyde-music-container.sidebar-collapsed .hyde-sidebar {
+  transform: translateX(-100%);
+  opacity: 0;
+  padding: 0;
+  width: 0;
 }
 
 /* Sidebar Styling */
@@ -71,6 +83,8 @@ body {
 }
 
 .sidebar-nav {
+  position: relative;
+  /* Anchor for absolute close button */
   background-color: var(--color-bg-surface);
   border-radius: 8px;
   padding: 12px 16px;
@@ -202,6 +216,49 @@ body {
   display: flex;
   flex-direction: column;
   height: calc(100vh - var(--player-height) - 16px);
+}
+
+/* Sidebar Toggle Button */
+.sidebar-toggle {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  margin-right: 16px;
+}
+
+.sidebar-toggle:hover {
+  background-color: var(--color-bg-highlight);
+  color: var(--color-text-primary);
+}
+
+.sidebar-close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex !important;
+  /* Ensure visibility globally */
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.sidebar-close-btn:hover {
+  background-color: var(--color-bg-highlight);
+  color: var(--color-text-primary);
 }
 
 .main-header {
@@ -944,5 +1001,666 @@ body {
 
   .player-center {
     width: 100%;
+  }
+}
+
+/* --- Global App Resets --- */
+.App.dark-theme {
+  min-height: 100vh;
+  background-color: #050505;
+  color: white;
+}
+
+/* --- Loading Container (Full Screen) --- */
+.app-loading-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background: #09090b;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.loading-content {
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+/* --- Typography --- */
+.loading-logo {
+  font-size: 2rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #ffffff 0%, #a1a1aa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0;
+}
+
+.loading-text {
+  font-size: 1rem;
+  color: #a1a1aa;
+  font-weight: 500;
+  min-height: 24px;
+  /* Prevents layout jump */
+  transition: opacity 0.5s ease;
+}
+
+.fade-in {
+  opacity: 1;
+}
+
+.fade-out {
+  opacity: 0;
+}
+
+/* --- Audio Wave Animation --- */
+.audio-wave {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+}
+
+.audio-wave span {
+  display: block;
+  width: 6px;
+  height: 10px;
+  background: #ff3e3e;
+  /* Hyde Red */
+  border-radius: 4px;
+  animation: wave 1.2s infinite ease-in-out;
+  box-shadow: 0 0 10px rgba(255, 62, 62, 0.5);
+}
+
+/* Stagger the animation for wave effect */
+.audio-wave span:nth-child(1) {
+  animation-delay: 0.0s;
+}
+
+.audio-wave span:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.audio-wave span:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.audio-wave span:nth-child(4) {
+  animation-delay: 0.3s;
+}
+
+.audio-wave span:nth-child(5) {
+  animation-delay: 0.4s;
+}
+
+@keyframes wave {
+
+  0%,
+  100% {
+    height: 10px;
+    transform: scaleY(1);
+    opacity: 0.5;
+  }
+
+  50% {
+    height: 40px;
+    transform: scaleY(1.2);
+    opacity: 1;
+  }
+}
+
+/* --- Reusing Ambient Glow (Copy if not imported from SignInPage.css) --- */
+.ambient-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  z-index: 0;
+  opacity: 0.5;
+}
+
+.glow-1 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, #5b2c2c 0%, rgba(0, 0, 0, 0) 70%);
+  top: -50px;
+  left: -50px;
+}
+
+.glow-2 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, #1a1a2e 0%, rgba(0, 0, 0, 0) 70%);
+  bottom: -100px;
+  right: -100px;
+}
+
+
+/* Ensure the app takes full height */
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #050505;
+  /* Matches the theme */
+}
+
+/* Hide default scrollbar but allow scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom Scrollbar for Library/Main View */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.main-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 18px 22px;
+  gap: 16px;
+
+  background: rgba(10, 10, 10, 0.7);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.header-left {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* SEARCH BAR */
+.search-container {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 10px 14px;
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  transition: 0.2s ease;
+}
+
+.search-container:focus-within {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+}
+
+.search-icon {
+  opacity: 0.8;
+  flex-shrink: 0;
+}
+
+.search-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+
+  font-size: 14px;
+  color: white;
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* CLEAR BUTTON */
+.search-clear-btn {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-clear-btn:hover {
+  color: white;
+}
+
+/* SUGGESTIONS */
+.suggestions-box {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: 100%;
+
+  background: rgba(20, 20, 20, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+
+  padding: 6px;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 10px 12px;
+  border-radius: 10px;
+
+  cursor: pointer;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.suggestion-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+
+/* ===== FIX HEADER HEIGHT + ALIGNMENT ===== */
+
+.main-header {
+  height: 72px;
+  min-height: 72px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 22px;
+  gap: 16px;
+
+  position: sticky;
+  top: 0;
+  z-index: 100;
+
+  background: rgba(10, 10, 10, 0.72);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Left side */
+.header-left {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+/* Right side */
+.header-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+}
+
+/* Search bar box */
+.search-container {
+  width: 100%;
+  max-width: 520px;
+
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 0 14px;
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  transition: 0.2s ease;
+}
+
+.search-container:focus-within {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+}
+
+/* Icon */
+.search-icon {
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+
+/* Input */
+.search-input {
+  height: 100%;
+  width: 100%;
+
+  border: none;
+  outline: none;
+  background: transparent;
+
+  font-size: 14px;
+  color: white;
+  padding: 0;
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.main-header {
+  height: 72px;
+  min-height: 72px;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 22px;
+  gap: 16px;
+
+  position: sticky;
+  top: 0;
+  z-index: 100;
+
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+
+  border-bottom: none !important;
+}
+
+.hyde-main-content {
+  background: linear-gradient(to bottom, #1f1f1f 0%, #121212 40%);
+}
+
+.hyde-main-content {
+  background: #121212 !important;
+}
+
+.search-container {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: none !important;
+}
+
+.search-container:focus-within {
+  background: transparent !important;
+  border-color: rgba(255, 0, 0, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(255, 0, 0, 0.12) !important;
+}
+
+.search-input {
+  background: transparent !important;
+}
+
+.search-container {
+  max-width: 800px !important;
+  /* increase this */
+  width: 100% !important;
+}
+
+.search-container {
+  max-width: 100% !important;
+}
+
+/* ===== SIDEBAR SCROLLBAR FIX ===== */
+
+.sidebar-playlists {
+  overflow-y: auto !important;
+  padding-right: 8px;
+  /* gives space so scrollbar doesn't overlap content */
+}
+
+/* Chrome / Edge / Brave */
+.sidebar-playlists::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-playlists::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-playlists::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+}
+
+.sidebar-playlists::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* Firefox */
+.sidebar-playlists {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.sidebar-library {
+  overflow: hidden !important;
+}
+
+/* ===== Apple Liquid Glass Search Bar ===== */
+
+.search-container {
+  background: rgba(255, 255, 255, 0.06) !important;
+  backdrop-filter: blur(18px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(160%) !important;
+
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* On focus (more glow) */
+.search-container:focus-within {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08),
+    0 12px 40px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* Input text stays clean */
+.search-input {
+  background: transparent !important;
+}
+
+/* ===== RESPONSIVE SIDEBAR & MOBILE BRAND ===== */
+
+/* Default Desktop: Hide Mobile Brand */
+.mobile-brand {
+  display: none;
+}
+
+/* Mobile & Tablet Styles */
+@media (max-width: 768px) {
+
+  /* Show close button on mobile */
+  .sidebar-close-btn {
+    display: flex;
+  }
+
+  /* 1. Layout: Single Column */
+  .hyde-music-container {
+    grid-template-columns: 1fr;
+    /* Sidebar is overlaid, so main takes full width */
+  }
+
+  /* 2. Sidebar: Fixed Overlay */
+  .hyde-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 280px;
+    /* Or 85vw for very small screens */
+    max-width: 85vw;
+    z-index: 1001;
+    /* Above header (100) and content */
+    background-color: #121212;
+    /* Unified dark background (Surface color) */
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+    transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+
+    /* Remove gaps for unified look */
+    padding: 0;
+    gap: 0;
+  }
+
+  /* Make inner containers transparent and full width on mobile */
+  .sidebar-nav,
+  .sidebar-library {
+    background-color: transparent !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    width: 100%;
+  }
+
+  /* Add subtle separator */
+  .sidebar-library {
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  /* 3. Collapsed State on Mobile */
+  /* When sidebar-collapsed class is present, move sidebar off-screen */
+  .hyde-music-container.sidebar-collapsed .hyde-sidebar {
+    transform: translateX(-100%);
+    width: 280px;
+    padding: 8px;
+    opacity: 1;
+  }
+
+  /* 4. Mobile Brand */
+  .mobile-brand {
+    display: block;
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--color-primary);
+    white-space: nowrap;
+    margin-right: auto;
+    padding-left: 8px;
+    letter-spacing: -0.5px;
+  }
+
+  /* 5. Header Adjustments */
+  .main-header {
+    gap: 12px;
+    padding: 0 16px;
+  }
+
+  .search-container {
+    max-width: 100%;
+    width: auto;
+    flex: 1;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  /* Ensure main content isn't shifted when sidebar opens/closes on mobile */
+  .hyde-music-container.sidebar-collapsed {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Sidebar top bar */
+.sidebar-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Close button inside sidebar */
+.sidebar-close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: 0.2s ease;
+}
+
+.sidebar-close-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+}
+
+/* Mobile sidebar slide effect */
+@media (max-width: 768px) {
+  .hyde-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: calc(100vh - var(--player-height));
+    width: 280px;
+    z-index: 9999;
+
+    transform: translateX(-110%);
+    transition: transform 0.25s ease;
+  }
+
+  .hyde-sidebar.open {
+    transform: translateX(0%);
+  }
+
+  .hyde-sidebar.closed {
+    transform: translateX(-110%);
   }
 }

@@ -1,0 +1,7 @@
+flask==3.0.3
+flask-cors==4.0.1
+requests>=2.32.2
+yt-dlp>=2023.11.16
+python-dotenv==1.0.0
+urllib3>=1.26.0
+pydantic==1.10.2

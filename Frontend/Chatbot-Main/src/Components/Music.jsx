@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   X, Search, Play, Pause, SkipBack, SkipForward, Music,
   Shuffle, List, Plus, Volume2, VolumeX, Check, Sparkles,
-  Home, Library, Trash2, Heart, Repeat
+  Home, Library, Trash2, Heart, Repeat, Menu
 } from "lucide-react";
 import AuthButton from "./AuthButton";
 import { apiFetch, transformTrack } from "../api/client";
@@ -27,6 +27,14 @@ const CURATED_PLAYLISTS = [
 ];
 
 
+const getGreeting = () => {
+  const hour = new Date().getHours();
+
+  if (hour >= 5 && hour < 12) return "Good Morning";
+  if (hour >= 12 && hour < 17) return "Good Afternoon";
+  if (hour >= 17 && hour < 21) return "Good Evening";
+  return "Good Night";
+};
 const PremiumLoader = () => (
   <div className="premium-loader">
     <span></span><span></span><span></span><span></span><span></span>
@@ -34,6 +42,7 @@ const PremiumLoader = () => (
 );
 
 export default function MusicPage() {
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
   const [activeView, setActiveView] = useState("home");
   const [selectedPlaylistId, setSelectedPlaylistId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -105,6 +114,8 @@ export default function MusicPage() {
     }, 3000);
   };
 
+  const containerClass = `hyde-music-container ${sidebarOpen ? '' : 'sidebar-collapsed'}`;
+
   useEffect(() => {
     const initYouTubeAPI = () => {
       if (window.YT && window.YT.Player) {
@@ -158,6 +169,7 @@ export default function MusicPage() {
       }
       return;
     }
+
 
     let nextIdx = isShuffled
       ? Math.floor(Math.random() * playlist.length)
@@ -467,70 +479,141 @@ export default function MusicPage() {
     (selectedPlaylist?.type === 'system' ? systemTracks[selectedPlaylist.id] || [] : selectedPlaylist?.tracks || []);
 
   return (
-    <div className="hyde-music-container animate-fade">
-      <nav className="hyde-sidebar">
-        <div className="sidebar-nav">
-          <div className="brand" onClick={() => setActiveView('home')} style={{ cursor: 'pointer' }}>
-            <Music size={28} className="color-primary" />
-            <h1>Hyde Music</h1>
-          </div>
-          <div className={`nav-item ${activeView === 'home' ? 'active' : ''}`} onClick={() => setActiveView('home')}>
-            <Home size={24} /> <span>Home</span>
-          </div>
-          <div className={`nav-item ${activeView === 'search' ? 'active' : ''}`} onClick={() => setActiveView('search')}>
-            <Search size={24} /> <span>Search</span>
-          </div>
+    <div className={`${containerClass} animate-fade`}>
+  <nav className={`hyde-sidebar ${sidebarOpen ? "open" : "closed"}`}>
+    <div className="sidebar-nav">
+
+      {/* TOP BAR: BRAND + CLOSE BUTTON */}
+      <div className="sidebar-topbar">
+        <div
+          className="brand"
+          onClick={() => {
+            setActiveView("home");
+            if (window.innerWidth <= 768) setSidebarOpen(false);
+          }}
+          style={{ cursor: "pointer" }}
+        >
+          <h1>Hyde Music</h1>
+          <p>By Tirth</p>
         </div>
 
-        <div className="sidebar-library">
-          <div className="library-header">
-            <h3><Library size={24} /> <span>Your Library</span></h3>
-            <Plus size={20} className="plus-btn" onClick={createPlaylist} />
-          </div>
-          <div className="sidebar-playlists">
-            {playlists.map(pl => (
-              <div
-                key={pl.id}
-                className={`playlist-item ${selectedPlaylistId === pl.id && activeView === 'playlist' ? 'active-bg' : ''}`}
-                onClick={() => {
-                  setSelectedPlaylistId(pl.id);
-                  setActiveView('playlist');
+        {/* CLOSE BUTTON */}
+        <button
+          className="sidebar-close-btn"
+          onClick={() => setSidebarOpen(false)}
+          title="Close Sidebar"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      <div
+        className={`nav-item ${activeView === "home" ? "active" : ""}`}
+        onClick={() => {
+          setActiveView("home");
+          if (window.innerWidth <= 768) setSidebarOpen(false);
+        }}
+      >
+        <Home size={24} /> <span>Home</span>
+      </div>
+
+      <div
+        className={`nav-item ${activeView === "search" ? "active" : ""}`}
+        onClick={() => {
+          setActiveView("search");
+          if (window.innerWidth <= 768) setSidebarOpen(false);
+        }}
+      >
+        <Search size={24} /> <span>Search</span>
+      </div>
+    </div>
+
+    <div className="sidebar-library">
+      <div className="library-header">
+        <h3>
+          <Library size={24} /> <span>Your Library</span>
+        </h3>
+        <Plus size={20} className="plus-btn" onClick={createPlaylist} />
+      </div>
+
+      <div className="sidebar-playlists">
+        {playlists.map((pl) => (
+          <div
+            key={pl.id}
+            className={`playlist-item ${
+              selectedPlaylistId === pl.id && activeView === "playlist" ? "active-bg" : ""
+            }`}
+            onClick={() => {
+              setSelectedPlaylistId(pl.id);
+              setActiveView("playlist");
+              if (window.innerWidth <= 768) setSidebarOpen(false);
+            }}
+          >
+            <div className="playlist-art">
+              {pl.id === "liked" ? (
+                <Heart className="text-red-500 fill-red-500" />
+              ) : (
+                <List size={24} />
+              )}
+            </div>
+
+            <div className="playlist-info">
+              <div className="playlist-name">{pl.name}</div>
+              <div className="playlist-meta">Playlist • {pl.tracks.length} songs</div>
+            </div>
+
+            {pl.type !== "system" && (
+              <Trash2
+                size={16}
+                className="text-dim hover:text-red-500"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removePlaylist(pl.id);
                 }}
-              >
-                <div className="playlist-art">
-                  {pl.id === 'liked' ? <Heart className="text-red-500 fill-red-500" /> : <List size={24} />}
-                </div>
-                <div className="playlist-info">
-                  <div className="playlist-name">{pl.name}</div>
-                  <div className="playlist-meta">Playlist • {pl.tracks.length} songs</div>
-                </div>
-                {pl.type !== 'system' && (
-                  <Trash2 size={16} className="text-dim hover:text-red-500" onClick={(e) => { e.stopPropagation(); removePlaylist(pl.id); }} />
-                )}
-              </div>
-            ))}
-            <div className="sidebar-divider"></div>
-            {CURATED_PLAYLISTS.map(pl => (
-              <div
-                key={pl.id}
-                className={`playlist-item ${selectedPlaylistId === pl.id && activeView === 'playlist' ? 'active-bg' : ''}`}
-                onClick={() => handlePlaylistClick(pl)}
-              >
-                <div className="playlist-art" style={{ background: `linear-gradient(135deg, ${pl.color}, #000)` }}>
-                  <Music size={18} color="white" />
-                </div>
-                <div className="playlist-info">
-                  <div className="playlist-name">{pl.name}</div>
-                  <div className="playlist-meta">Curated Playlist</div>
-                </div>
-              </div>
-            ))}
+              />
+            )}
           </div>
-        </div>
-      </nav>
+        ))}
+
+        <div className="sidebar-divider"></div>
+
+        {CURATED_PLAYLISTS.map((pl) => (
+          <div
+            key={pl.id}
+            className={`playlist-item ${
+              selectedPlaylistId === pl.id && activeView === "playlist" ? "active-bg" : ""
+            }`}
+            onClick={() => {
+              handlePlaylistClick(pl);
+              if (window.innerWidth <= 768) setSidebarOpen(false);
+            }}
+          >
+            <div
+              className="playlist-art"
+              style={{ background: `linear-gradient(135deg, ${pl.color}, #000)` }}
+            >
+              <Music size={18} color="white" />
+            </div>
+
+            <div className="playlist-info">
+              <div className="playlist-name">{pl.name}</div>
+              <div className="playlist-meta">Curated Playlist</div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </nav>
+
 
       <main className="hyde-main-content" ref={mainContentRef}>
         <header className="main-header">
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="sidebar-toggle btn">
+            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+
+          <div className="mobile-brand">Hyde Music</div>
+
           <div className="search-container" ref={suggestionsRef}>
             <Search size={20} className="search-icon" />
             <input
@@ -566,7 +649,8 @@ export default function MusicPage() {
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ duration: 0.2 }}
               >
-                <h2 className="section-title">Good Evening</h2>
+                <h2 className="section-title">{getGreeting()}</h2>
+
                 <div className="shelf-grid-simple">
                   {playlists.concat(CURATED_PLAYLISTS.slice(0, 3)).slice(0, 6).map(pl => (
                     <div key={pl.id} className="simple-card glassy" onClick={() => handlePlaylistClick(pl)}>
