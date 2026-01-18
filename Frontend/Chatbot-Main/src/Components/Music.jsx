@@ -135,7 +135,10 @@ export default function MusicPage() {
 
   const fetchAutoplayTracks = useCallback(async (track) => {
     if (!track) return;
+    showToast("Finding next vibe... 🎵");
+
     try {
+      // First try: Get related songs from AI/Backend
       const response = await apiFetch(`/get_related_songs`, {
         method: 'POST',
         body: JSON.stringify({
@@ -145,16 +148,49 @@ export default function MusicPage() {
         }),
       });
       const data = await response.json();
+
+      let newTracks = [];
       if (data.tracks && data.tracks.length > 0) {
-        // Filter out current track if present and take the first new one
-        const newTrack = data.tracks.find(t => t.youtube_id !== track.youtube_id) || data.tracks[0];
-        setPlaylist(prev => [...prev, newTrack]);
-        setCurrentIndex(prev => prev + 1);
-        setCurrentTrack(newTrack);
-        showToast("Autoplay: Coming up next!");
+        newTracks = data.tracks;
+      } else {
+        // Fallback: Just search for similar vibe
+        const fallbackRes = await apiFetch(`/search?q=${encodeURIComponent(track.artists?.[0] + " " + track.name + " mix")}`);
+        const fallbackData = await fallbackRes.json();
+        newTracks = Array.isArray(fallbackData) ? fallbackData : (fallbackData.tracks || []);
       }
-    } catch { /* ignore */ }
-  }, []);
+
+      if (newTracks.length > 0) {
+        // Filter out duplicates using Title/Artist matching (Fuzzy Check)
+        const normalize = str => str ? str.toLowerCase().replace(/[^a-z0-9]/g, "") : "";
+
+        const uniqueNew = newTracks.filter(t => {
+          const tName = normalize(t.name || t.title);
+          // Check against current playlist
+          const inPlaylist = playlist.some(existing => normalize(existing.name) === tName);
+          // Check against recently played to avoid repeats
+          const inHistory = recentlyPlayed.some(history => normalize(history.name) === tName);
+
+          return !inPlaylist && !inHistory;
+        });
+
+        // If strict filtering removed everything, relax it (just check playlist)
+        const nextCandidate = uniqueNew.length > 0 ? uniqueNew[0] : newTracks.find(t => !playlist.some(p => p.id === t.id));
+
+        if (nextCandidate) {
+          const transformed = transformTrack(nextCandidate); // Ensure consistent format
+          setPlaylist(prev => [...prev, transformed]);
+          setCurrentIndex(prev => prev + 1);
+          setCurrentTrack(transformed);
+          setIsPlaying(true); // Force play state
+          showToast(`Playing next: ${transformed.name}`);
+        } else {
+          showToast("No new related tracks found.", "info");
+        }
+      }
+    } catch (e) {
+      console.error("Autoplay failed", e);
+    }
+  }, [playlist, recentlyPlayed]);
 
   const handleNext = useCallback(() => {
     if (playlist.length === 0) return;
@@ -294,6 +330,12 @@ export default function MusicPage() {
     setSearchLoading(true);
     setShowSuggestions(false);
     setActiveView("search");
+
+    // notify if server is sleeping (Render cold start)
+    const wakeupTimer = setTimeout(() => {
+      showToast("Server is waking up... please wait a moment 💤", "info");
+    }, 2500);
+
     try {
       let response = await apiFetch(`/search_music`, {
         method: 'POST',
@@ -313,6 +355,7 @@ export default function MusicPage() {
       console.error("Search error:", err);
       showToast("Search failed. Please try again.", "error");
     } finally {
+      clearTimeout(wakeupTimer);
       setSearchLoading(false);
     }
   }, []);
@@ -480,130 +523,128 @@ export default function MusicPage() {
 
   return (
     <div className={`${containerClass} animate-fade`}>
-  <nav className={`hyde-sidebar ${sidebarOpen ? "open" : "closed"}`}>
-    <div className="sidebar-nav">
+      <nav className={`hyde-sidebar ${sidebarOpen ? "open" : "closed"}`}>
+        <div className="sidebar-nav">
 
-      {/* TOP BAR: BRAND + CLOSE BUTTON */}
-      <div className="sidebar-topbar">
-        <div
-          className="brand"
-          onClick={() => {
-            setActiveView("home");
-            if (window.innerWidth <= 768) setSidebarOpen(false);
-          }}
-          style={{ cursor: "pointer" }}
-        >
-          <h1>Hyde Music</h1>
-          <p>By Tirth</p>
+          {/* TOP BAR: BRAND + CLOSE BUTTON */}
+          <div className="sidebar-topbar">
+            <div
+              className="brand"
+              onClick={() => {
+                setActiveView("home");
+                if (window.innerWidth <= 768) setSidebarOpen(false);
+              }}
+              style={{ cursor: "pointer" }}
+            >
+              <h1>Hyde Music</h1>
+              <p>By Tirth</p>
+            </div>
+
+            {/* CLOSE BUTTON */}
+            <button
+              className="sidebar-close-btn"
+              onClick={() => setSidebarOpen(false)}
+              title="Close Sidebar"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div
+            className={`nav-item ${activeView === "home" ? "active" : ""}`}
+            onClick={() => {
+              setActiveView("home");
+              if (window.innerWidth <= 768) setSidebarOpen(false);
+            }}
+          >
+            <Home size={24} /> <span>Home</span>
+          </div>
+
+          <div
+            className={`nav-item ${activeView === "search" ? "active" : ""}`}
+            onClick={() => {
+              setActiveView("search");
+              if (window.innerWidth <= 768) setSidebarOpen(false);
+            }}
+          >
+            <Search size={24} /> <span>Search</span>
+          </div>
         </div>
 
-        {/* CLOSE BUTTON */}
-        <button
-          className="sidebar-close-btn"
-          onClick={() => setSidebarOpen(false)}
-          title="Close Sidebar"
-        >
-          <X size={18} />
-        </button>
-      </div>
+        <div className="sidebar-library">
+          <div className="library-header">
+            <h3>
+              <Library size={24} /> <span>Your Library</span>
+            </h3>
+            <Plus size={20} className="plus-btn" onClick={createPlaylist} />
+          </div>
 
-      <div
-        className={`nav-item ${activeView === "home" ? "active" : ""}`}
-        onClick={() => {
-          setActiveView("home");
-          if (window.innerWidth <= 768) setSidebarOpen(false);
-        }}
-      >
-        <Home size={24} /> <span>Home</span>
-      </div>
-
-      <div
-        className={`nav-item ${activeView === "search" ? "active" : ""}`}
-        onClick={() => {
-          setActiveView("search");
-          if (window.innerWidth <= 768) setSidebarOpen(false);
-        }}
-      >
-        <Search size={24} /> <span>Search</span>
-      </div>
-    </div>
-
-    <div className="sidebar-library">
-      <div className="library-header">
-        <h3>
-          <Library size={24} /> <span>Your Library</span>
-        </h3>
-        <Plus size={20} className="plus-btn" onClick={createPlaylist} />
-      </div>
-
-      <div className="sidebar-playlists">
-        {playlists.map((pl) => (
-          <div
-            key={pl.id}
-            className={`playlist-item ${
-              selectedPlaylistId === pl.id && activeView === "playlist" ? "active-bg" : ""
-            }`}
-            onClick={() => {
-              setSelectedPlaylistId(pl.id);
-              setActiveView("playlist");
-              if (window.innerWidth <= 768) setSidebarOpen(false);
-            }}
-          >
-            <div className="playlist-art">
-              {pl.id === "liked" ? (
-                <Heart className="text-red-500 fill-red-500" />
-              ) : (
-                <List size={24} />
-              )}
-            </div>
-
-            <div className="playlist-info">
-              <div className="playlist-name">{pl.name}</div>
-              <div className="playlist-meta">Playlist • {pl.tracks.length} songs</div>
-            </div>
-
-            {pl.type !== "system" && (
-              <Trash2
-                size={16}
-                className="text-dim hover:text-red-500"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removePlaylist(pl.id);
+          <div className="sidebar-playlists">
+            {playlists.map((pl) => (
+              <div
+                key={pl.id}
+                className={`playlist-item ${selectedPlaylistId === pl.id && activeView === "playlist" ? "active-bg" : ""
+                  }`}
+                onClick={() => {
+                  setSelectedPlaylistId(pl.id);
+                  setActiveView("playlist");
+                  if (window.innerWidth <= 768) setSidebarOpen(false);
                 }}
-              />
-            )}
+              >
+                <div className="playlist-art">
+                  {pl.id === "liked" ? (
+                    <Heart className="text-red-500 fill-red-500" />
+                  ) : (
+                    <List size={24} />
+                  )}
+                </div>
+
+                <div className="playlist-info">
+                  <div className="playlist-name">{pl.name}</div>
+                  <div className="playlist-meta">Playlist • {pl.tracks.length} songs</div>
+                </div>
+
+                {pl.type !== "system" && (
+                  <Trash2
+                    size={16}
+                    className="text-dim hover:text-red-500"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removePlaylist(pl.id);
+                    }}
+                  />
+                )}
+              </div>
+            ))}
+
+            <div className="sidebar-divider"></div>
+
+            {CURATED_PLAYLISTS.map((pl) => (
+              <div
+                key={pl.id}
+                className={`playlist-item ${selectedPlaylistId === pl.id && activeView === "playlist" ? "active-bg" : ""
+                  }`}
+                onClick={() => {
+                  handlePlaylistClick(pl);
+                  if (window.innerWidth <= 768) setSidebarOpen(false);
+                }}
+              >
+                <div
+                  className="playlist-art"
+                  style={{ background: `linear-gradient(135deg, ${pl.color}, #000)` }}
+                >
+                  <Music size={18} color="white" />
+                </div>
+
+                <div className="playlist-info">
+                  <div className="playlist-name">{pl.name}</div>
+                  <div className="playlist-meta">Curated Playlist</div>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-
-        <div className="sidebar-divider"></div>
-
-        {CURATED_PLAYLISTS.map((pl) => (
-          <div
-            key={pl.id}
-            className={`playlist-item ${
-              selectedPlaylistId === pl.id && activeView === "playlist" ? "active-bg" : ""
-            }`}
-            onClick={() => {
-              handlePlaylistClick(pl);
-              if (window.innerWidth <= 768) setSidebarOpen(false);
-            }}
-          >
-            <div
-              className="playlist-art"
-              style={{ background: `linear-gradient(135deg, ${pl.color}, #000)` }}
-            >
-              <Music size={18} color="white" />
-            </div>
-
-            <div className="playlist-info">
-              <div className="playlist-name">{pl.name}</div>
-              <div className="playlist-meta">Curated Playlist</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  </nav>
+        </div>
+      </nav>
 
 
       <main className="hyde-main-content" ref={mainContentRef}>
