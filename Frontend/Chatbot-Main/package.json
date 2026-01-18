@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.43.1",
+    "@clerk/themes": "^2.4.48",
     "framer-motion": "^12.23.12",
     "lucide-react": "^0.540.0",
     "react": "^18.2.0",
