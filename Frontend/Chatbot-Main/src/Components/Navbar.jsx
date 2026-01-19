@@ -65,11 +65,10 @@ export default function Navbar() {
     return (
         <>
             <nav
-                className={`fixed top-0 left-0 right-0 z-[100] h-20 transition-all duration-500 border-b ${
-                    scrolled
-                        ? "bg-[#050505]/80 backdrop-blur-2xl border-white/5 shadow-2xl"
-                        : "bg-transparent border-transparent"
-                }`}
+                className={`fixed top-0 left-0 right-0 z-[100] h-20 transition-all duration-500 border-b ${scrolled
+                    ? "bg-[#050505]/80 backdrop-blur-2xl border-white/5 shadow-2xl"
+                    : "bg-transparent border-transparent"
+                    }`}
             >
                 <div className="max-w-7xl mx-auto flex items-center justify-between h-full px-6">
                     {/* --- Logo --- */}
@@ -94,9 +93,8 @@ export default function Navbar() {
                                     <Link
                                         key={link.path}
                                         to={link.path}
-                                        className={`relative px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-300 z-10 ${
-                                            isActive ? "text-white" : "text-gray-400 hover:text-white"
-                                        }`}
+                                        className={`relative px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-300 z-10 ${isActive ? "text-white" : "text-gray-400 hover:text-white"
+                                            }`}
                                     >
                                         {isActive && (
                                             <motion.div
@@ -117,7 +115,7 @@ export default function Navbar() {
                         <div className="hidden md:block scale-90">
                             <AuthButton />
                         </div>
-                        
+
                         <Magnetic>
                             <Link
                                 to="/music"
@@ -165,20 +163,18 @@ export default function Navbar() {
                                         <Link
                                             to={link.path}
                                             onClick={() => setIsMobileMenuOpen(false)}
-                                            className={`text-5xl font-black tracking-tighter flex items-center gap-6 group ${
-                                                location.pathname === link.path ? "text-[#ff3e3e]" : "text-white/40"
-                                            }`}
+                                            className={`text-5xl font-black tracking-tighter flex items-center gap-6 group ${location.pathname === link.path ? "text-[#ff3e3e]" : "text-white/40"
+                                                }`}
                                         >
-                                            <span className={`text-sm font-mono transition-colors ${
-                                                location.pathname === link.path ? "text-[#ff3e3e]" : "text-white/20 group-hover:text-white/60"
-                                            }`}>0{i + 1}</span>
+                                            <span className={`text-sm font-mono transition-colors ${location.pathname === link.path ? "text-[#ff3e3e]" : "text-white/20 group-hover:text-white/60"
+                                                }`}>0{i + 1}</span>
                                             <span className="group-hover:text-white transition-colors">{link.title}</span>
                                         </Link>
                                     </motion.div>
                                 ))}
                             </div>
 
-                            <motion.div 
+                            <motion.div
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.4 }}

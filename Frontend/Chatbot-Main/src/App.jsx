@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@clerk/clerk-react';
-import './App.css';
+import { supabase } from './supabaseClient';
 import MusicPage from './Components/Music';
 import SignInPage from './Components/SignInPage';
+import './App.css';
 
 const funnyMessages = [
   "Dropping the beat... 🎧",
@@ -16,10 +16,27 @@ const funnyMessages = [
 ];
 
 function App() {
-  const { isSignedIn, isLoaded } = useAuth();
-  const [isAppReady, setIsAppReady] = useState(false);
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [currentMessage, setCurrentMessage] = useState(funnyMessages[0]);
-  const [fade, setFade] = useState(true); // For smooth text transitions
+  const [fade, setFade] = useState(true);
+
+  useEffect(() => {
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    // Listen for changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Handle message rotation with fade effect
   useEffect(() => {
@@ -41,15 +58,10 @@ function App() {
   }, []);
 
   // Handle artificial loading delay for "premium feel"
-  useEffect(() => {
-    if (isLoaded) {
-      const timer = setTimeout(() => setIsAppReady(true), 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoaded]);
+
 
   // Unified Loading Screen
-  if (!isLoaded || !isAppReady) {
+  if (loading) {
     return (
       <div className="app-loading-container">
         {/* Ambient Background Glows (Consistent with SignIn) */}
@@ -58,7 +70,7 @@ function App() {
 
         <div className="loading-content">
           <h1 className="loading-logo">Hyde Music</h1>
-          
+
           {/* Custom Audio Wave Loader */}
           <div className="audio-wave">
             <span></span><span></span><span></span><span></span><span></span>
@@ -73,13 +85,14 @@ function App() {
   }
 
   // Main App Logic
-  if (!isSignedIn) {
+  if (!loading && !session) {
     return <SignInPage />;
   }
 
   return (
     <div className="App dark-theme">
-      <MusicPage />
+      {/* Pass session to MusicPage */}
+      <MusicPage key={session?.user.id} session={session} />
     </div>
   );
 }

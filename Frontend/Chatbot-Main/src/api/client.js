@@ -1,4 +1,4 @@
-const API = import.meta.env.VITE_BACKEND_URL;
+const API = import.meta.env.VITE_BACKEND_URL || "";
 const KEY = import.meta.env.VITE_HYDE_API_KEY;
 
 export async function apiFetch(path, options = {}) {

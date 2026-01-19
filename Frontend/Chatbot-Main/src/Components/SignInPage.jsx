@@ -1,7 +1,6 @@
 import React from 'react';
-import { SignIn } from '@clerk/clerk-react';
-import { dark } from '@clerk/themes'; // Optional: Use if you have @clerk/themes installed
-import './SignInPage.css'; // Make sure to create this file
+import Auth from './Auth';
+import './SignInPage.css';
 
 export default function SignInPage() {
   return (
@@ -20,28 +19,8 @@ export default function SignInPage() {
           </p>
         </div>
 
-        <div className="clerk-container">
-          <SignIn
-            appearance={{
-              baseTheme: dark, // Remove this line if you don't have @clerk/themes
-              variables: {
-                colorPrimary: '#ff3e3e', // Matches your red accent
-                colorText: 'white',
-                colorBackground: 'rgba(255, 255, 255, 0.05)',
-                colorInputBackground: 'rgba(0, 0, 0, 0.4)',
-                borderRadius: '12px',
-              },
-              elements: {
-                card: "custom-clerk-card",
-                headerTitle: "clerk-header-title",
-                headerSubtitle: "clerk-header-subtitle",
-                socialButtonsBlockButton: "clerk-social-btn",
-                formButtonPrimary: "clerk-primary-btn",
-                footerActionLink: "clerk-link"
-              }
-            }}
-            redirectUrl="/"
-          />
+        <div className="clerk-container"> {/* Keep class for layout but using Auth component */}
+          <Auth />
         </div>
       </div>
     </div>
